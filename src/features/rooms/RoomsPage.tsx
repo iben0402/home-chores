@@ -3,6 +3,9 @@ import { Icon } from '../../components/Icon'
 import { RoomCard } from '../../components/RoomCard'
 import { useHousehold } from '../shell/useHousehold'
 import { useIsAdmin } from '../shell/useIsAdmin'
+import { todayISO } from '../../lib/schedule'
+import { roomCounts } from '../chores/choreList'
+import { useOpenOccurrences } from '../chores/useHouseholdData'
 import { useRooms } from './useRooms'
 
 /** 1a · Rooms tab. Counts are 0 ("All clear") until chores exist. */
@@ -11,6 +14,7 @@ export function RoomsPage() {
   const isAdmin = useIsAdmin()
   const rooms = useRooms(household.id)
   const navigate = useNavigate()
+  const counts = roomCounts(useOpenOccurrences(household.id) ?? [], todayISO())
 
   return (
     <div className="pb-6">
@@ -18,7 +22,7 @@ export function RoomsPage() {
       <p className="m-0 px-4 pt-0.5 text-[15px] leading-[22px] text-fg-muted">Open chores in each room. Tap a room to see them.</p>
       <div className="grid grid-cols-2 gap-3 px-4 pt-2">
         {rooms?.map((room) => (
-          <RoomCard key={room.id} name={room.name} icon={room.icon} open={0} onClick={() => navigate(`/h/${household.id}/rooms/${room.id}`)} />
+          <RoomCard key={room.id} name={room.name} icon={room.icon} open={counts[room.id]?.open ?? 0} overdue={counts[room.id]?.overdue ?? 0} onClick={() => navigate(`/h/${household.id}/rooms/${room.id}`)} />
         ))}
       </div>
       {isAdmin && (
