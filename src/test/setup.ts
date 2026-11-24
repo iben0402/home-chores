@@ -26,6 +26,9 @@ vi.mock('../data/households', async (importOriginal) => {
     }),
     regenerateInviteCode: vi.fn(),
     removeMember: vi.fn(),
+    setAdmin: vi.fn(),
+    renameHousehold: vi.fn(),
+    updateMyName: vi.fn(),
     watchMembers: vi.fn((_db, _hid, cb) => {
       cb([{ uid: 'u1', displayName: 'Anna Nowak', color: 1 }])
       return () => {}

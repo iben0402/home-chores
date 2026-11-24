@@ -8,7 +8,8 @@ import { GetStartedPage } from '../features/households/GetStartedPage'
 import { JoinCodePage } from '../features/households/JoinCodePage'
 import { JoinPage } from '../features/households/JoinPage'
 import { HouseholdRoute } from '../features/shell/HouseholdLayout'
-import { HouseholdTabPlaceholder } from '../features/shell/HouseholdTabPlaceholder'
+import { AccountPage } from '../features/household/AccountPage'
+import { HouseholdPage } from '../features/household/HouseholdPage'
 import { TodayPage } from '../features/shell/TodayPage'
 import { ChorePage } from '../features/chores/ChorePage'
 import { EditChorePage } from '../features/chores/EditChorePage'
@@ -47,12 +48,13 @@ export const routes: RouteObject[] = [
           { path: '/start', element: <GetStartedPage /> },
           { path: '/households/new', element: <CreateHouseholdPage /> },
           { path: '/join', element: <JoinCodePage /> },
+          { path: '/account', element: <AccountPage /> },
           {
             path: '/h/:hid',
             element: <HouseholdRoute />,
             children: [
               { index: true, element: <TodayPage /> },
-              { path: 'household', element: <HouseholdTabPlaceholder /> },
+              { path: 'household', element: <HouseholdPage /> },
               { path: 'rooms', element: <RoomsPage /> },
               { path: 'chores/new', element: <NewChorePage /> },
               { path: 'chores/:choreId', element: <ChorePage /> },

@@ -199,13 +199,18 @@ export function watchInviteCode(db: Firestore, hid: string, onChange: (code: str
   return onSnapshot(doc(db, 'households', hid, 'private', 'invite'), (snap) => onChange(snap.data()?.code ?? null), onError)
 }
 
-export type Member = { uid: string; displayName: string; color: MemberColor }
+export type Member = { uid: string; displayName: string; color: MemberColor; joinedAt?: Date }
 
 /** Live members of a household (names and colours for avatars), in join order of colour. */
 export function watchMembers(db: Firestore, hid: string, onChange: (members: Member[]) => void, onError?: (e: Error) => void): Unsubscribe {
   return onSnapshot(
     collection(db, 'households', hid, 'members'),
-    (snap) => onChange(snap.docs.map((d) => ({ uid: d.id, displayName: d.data().displayName, color: d.data().color })).sort((a, b) => a.color - b.color)),
+    (snap) =>
+      onChange(
+        snap.docs
+          .map((d) => ({ uid: d.id, displayName: d.data().displayName, color: d.data().color, joinedAt: d.data().joinedAt?.toDate?.() }))
+          .sort((a, b) => a.color - b.color),
+      ),
     onError,
   )
 }

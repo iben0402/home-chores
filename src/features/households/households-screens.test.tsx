@@ -1,6 +1,6 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { signOut, updateDisplayName } from '../../data/auth'
+import { updateDisplayName } from '../../data/auth'
 import {
   createHousehold,
   findInvite,
@@ -22,7 +22,7 @@ vi.mock('../../data/auth', async (importOriginal) => ({
 
 const households = (...ids: string[]) =>
   vi.mocked(watchMyHouseholds).mockImplementation((_db, _uid, cb) => {
-    cb(ids.map((id) => ({ id, name: `Home ${id}` })))
+    cb(ids.map((id) => ({ id, name: `Home ${id}`, adminUids: [] })))
     return () => {}
   })
 
@@ -219,16 +219,6 @@ describe('review fixes', () => {
     await act(() => router.navigate('/h/h2'))
     expect(screen.getByText('Mum’s house')).toBeInTheDocument()
     expect(screen.queryByText('Flat on Main St')).not.toBeInTheDocument()
-  })
-})
-
-describe('Household tab (until the account screen exists)', () => {
-  test('has Log out', async () => {
-    const user = userEvent.setup()
-    vi.mocked(signOut).mockResolvedValue()
-    renderApp('/h/h1/household', ANNA)
-    await user.click(screen.getByRole('button', { name: 'Log out' }))
-    expect(signOut).toHaveBeenCalled()
   })
 })
 
