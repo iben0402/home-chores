@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Avatar } from '../../components/Avatar'
 import { Button } from '../../components/Button'
+import { SegmentedControl } from '../../components/SegmentedControl'
+import { getThemePref, setThemePref, type ThemePref } from '../../lib/theme'
 import { TextField } from '../../components/TextField'
 import { TopBar } from '../../components/TopBar'
 import { signOut, updateDisplayName } from '../../data/auth'
@@ -19,6 +21,7 @@ export function AccountPage() {
   const [error, setError] = useState<string>()
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState<false | 'save' | 'logout'>(false)
+  const [theme, setTheme] = useState<ThemePref>(getThemePref)
   if (!user) return null
   const changed = name.trim() !== (user.displayName ?? '').trim()
   const google = auth.currentUser?.providerData.some((p) => p.providerId === 'google.com') ?? false
@@ -74,6 +77,23 @@ export function AccountPage() {
           {saved && !changed ? 'Saved' : 'Save name'}
         </Button>
       </form>
+      <div className="flex flex-col gap-1.5 px-4 pt-6">
+        <span className="text-[14px] leading-5 font-semibold">Appearance</span>
+        <SegmentedControl
+          label="Appearance"
+          value={theme}
+          onChange={(pref) => {
+            setTheme(pref)
+            setThemePref(pref)
+          }}
+          options={[
+            { value: 'system', label: 'System' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ]}
+        />
+        <p className="m-0 text-[13px] leading-[18px] text-fg-muted">System follows your phone or computer. Saved on this device.</p>
+      </div>
       <div className="flex-1" />
       <div className="flex flex-col gap-2 px-4 pt-8 pb-6">
         {households.length > 1 && <p className="m-0 text-center text-[13px] leading-[18px] text-fg-muted">You’re in {households.length} households. Your name is the same in each.</p>}

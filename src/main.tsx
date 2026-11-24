@@ -5,6 +5,9 @@ import { RouterProvider } from 'react-router/dom'
 import { routes } from './app/routes'
 import { AuthProvider } from './features/auth/AuthProvider'
 import './index.css'
+import { followSystemTheme } from './lib/theme'
+
+followSystemTheme()
 
 const router = createBrowserRouter(routes)
 
