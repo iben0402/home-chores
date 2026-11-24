@@ -32,6 +32,11 @@ Ordered by priority. "Confirmed" means it was reproduced against the Firestore e
 15. **M8 · "Today" isn't refreshed at midnight** while the app stays open.
 16. **M9 · Deleting a room** reads its chores outside the batch (a chore added at that moment keeps the old room), and a room with more than about 500 chores exceeds one batch.
 
+### History
+17. **Undo from History keeps the re-dated queue.** It reopens the entry and removes the extra occurrence the tick added, but an "after it's done" chore's later dates stay moved (the earlier dates aren't stored once the snackbar is gone). Fix with the `lastTick` record from the planned rules fix: store the previous dates there.
+18. **History loads the latest 200 entries**; older ones aren't reachable yet (no "load more").
+19. **"Open chore" and skipped entries** aren't in the entry sheet or the list yet; they need the chore page and Skip (chores part 3).
+
 ### Product question
 - **"Mine" on Today** currently shows everything assigned to you, including later occurrences. Spec §8.9 could also be read as "the next of each chore, plus later ones assigned to you".
 
