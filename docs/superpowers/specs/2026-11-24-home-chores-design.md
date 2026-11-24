@@ -159,7 +159,7 @@ To avoid clutter, the Today view shows **only the earliest open occurrence per c
 - **Join:** a signed-in user opens `/join/{code}`. The app reads the invite to get the household ID, then creates `households/{hid}/members/{uid}`. Rules allow creating your *own* member doc only when the invite's `householdId` matches. If you aren't signed in, the link sends you to login or signup and then returns you to the join page.
 - **Remove a member or leave:** one batch deletes the member doc, removes the user from `adminUids` if they're an admin, and unassigns all their **open** occurrences. Their past completions stay in history under the name repeated on each occurrence.
 - **Promote or demote:** edits `household.adminUids`. Rules forbid an empty `adminUids`.
-- **Display names:** taken from signup (or the Google profile) and copied into each member doc. If a user changes their name, the client updates their member doc in every household. Names copied into old occurrences and notifications aren't rewritten.
+- **Display names:** taken from signup (or the Google profile) and copied into each member doc. If the account has no name (saving it at sign-up failed, or a Google profile without one), "Get started" asks for it before anything else, so member docs never get an empty name. If a user changes their name, the client updates their member doc in every household. Names copied into old occurrences and notifications aren't rewritten.
 - **Joining twice:** if you're already a member, `/join/{code}` just opens the household.
 
 ### 8.8 Rooms

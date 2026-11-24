@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { sendReset, signIn, signInWithGoogle, signUp } from '../../data/auth'
 import { ANNA, renderApp } from '../../test/renderApp'
@@ -70,6 +70,41 @@ describe('Log in', () => {
   })
 })
 
+describe('Log in: focus and Google', () => {
+  test('a form submit replaces a pending Google popup, and the late popup error is ignored', async () => {
+    const user = userEvent.setup()
+    let rejectGoogle!: (error: unknown) => void
+    vi.mocked(signInWithGoogle).mockReturnValue(new Promise((_, reject) => (rejectGoogle = reject)))
+    vi.mocked(signIn).mockReturnValue(new Promise(() => {}))
+    renderApp('/login')
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com')
+    await user.type(screen.getByLabelText('Password', { selector: 'input' }), 'kitchen-24')
+    await user.click(screen.getByRole('button', { name: 'Log in' }))
+    expect(signIn).toHaveBeenCalledWith('anna@example.com', 'kitchen-24')
+    await act(async () => rejectGoogle(fail('auth/popup-closed-by-user')))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Logging in/ })).toHaveAttribute('aria-busy', 'true')
+  })
+
+  test('a request error moves focus to the field it belongs to', async () => {
+    const user = userEvent.setup()
+    vi.mocked(signIn).mockRejectedValue(fail('auth/invalid-credential'))
+    renderApp('/login')
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com')
+    await user.type(screen.getByLabelText('Password', { selector: 'input' }), 'wrong')
+    await user.click(screen.getByRole('button', { name: 'Log in' }))
+    await waitFor(() => expect(screen.getByLabelText('Password', { selector: 'input' })).toHaveFocus())
+  })
+
+  test('validation errors move focus to the first invalid field', async () => {
+    const user = userEvent.setup()
+    renderApp('/login')
+    await user.click(screen.getByRole('button', { name: 'Log in' }))
+    expect(screen.getByLabelText('Email')).toHaveFocus()
+  })
+})
+
 describe('Create account', () => {
   test('empty name shows the name error and does not call signUp', async () => {
     const user = userEvent.setup()
@@ -106,6 +141,29 @@ describe('Create account', () => {
   })
 })
 
+describe('Create account: no early redirect', () => {
+  test('stays on /signup until sign-up finishes, then goes to next', async () => {
+    const user = userEvent.setup()
+    let finish!: () => void
+    vi.mocked(signUp).mockReturnValue(new Promise<void>((resolve) => (finish = resolve)))
+    const { router, setUser } = renderApp('/signup?next=%2Fh%2Fabc')
+    await user.type(screen.getByLabelText('Your name'), 'Anna Nowak')
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com')
+    await user.type(screen.getByLabelText('Password', { selector: 'input' }), 'kitchen-24')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+    // Firebase reports the new user before the name is saved.
+    setUser({ ...ANNA, displayName: null })
+    expect(router.state.location.pathname).toBe('/signup')
+    await act(async () => finish())
+    await waitFor(() => expect(router.state.location.pathname).toBe('/h/abc'))
+  })
+
+  test('a signed-in visitor to /signup is sent on', () => {
+    const { router } = renderApp('/signup', ANNA)
+    expect(router.state.location.pathname).toBe('/')
+  })
+})
+
 describe('Forgot password', () => {
   test('shows the sent state after sending', async () => {
     const user = userEvent.setup()
@@ -115,6 +173,39 @@ describe('Forgot password', () => {
     await user.click(screen.getByRole('button', { name: 'Send reset link' }))
     expect(sendReset).toHaveBeenCalledWith('anna@example.com')
     expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeInTheDocument()
+  })
+})
+
+describe('Forgot password: follow-ups', () => {
+  test('keeps ?next= on the way back to log in', () => {
+    renderApp('/forgot?next=%2Fjoin%2FK7QM4XRT')
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login?next=%2Fjoin%2FK7QM4XRT')
+  })
+
+  test('a failed resend is shown, a successful one is confirmed', async () => {
+    const user = userEvent.setup()
+    vi.mocked(sendReset).mockResolvedValueOnce()
+    renderApp('/forgot')
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com')
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }))
+    await screen.findByRole('heading', { name: 'Check your email' })
+    vi.mocked(sendReset).mockRejectedValueOnce(fail('auth/too-many-requests'))
+    await user.click(screen.getByRole('button', { name: 'Send it again' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts. Wait a minute and try again.')
+    vi.mocked(sendReset).mockResolvedValueOnce()
+    await user.click(screen.getByRole('button', { name: 'Send it again' }))
+    expect(await screen.findByText('Sent again.')).toBeInTheDocument()
+  })
+})
+
+describe('Back button', () => {
+  test('opened directly, Back goes to log in instead of leaving the app', async () => {
+    const user = userEvent.setup()
+    // The tab has history from other sites before landing here.
+    vi.spyOn(window.history, 'length', 'get').mockReturnValue(3)
+    const { router } = renderApp('/signup')
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(router.state.location.pathname).toBe('/login')
   })
 })
 

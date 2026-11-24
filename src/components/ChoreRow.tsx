@@ -16,10 +16,12 @@ type ChoreRowProps = {
   onToggle?: (checked: boolean) => void
   onTake?: () => void
   className?: string
+  /** Example rows (e.g. the Welcome preview): not focusable, so they never look like real controls. */
+  decorative?: boolean
 }
 
 /** One chore: what (title), where/when (room + due badge), whose (avatar or Take it). */
-export function ChoreRow({ chore, onToggle, onTake, className }: ChoreRowProps) {
+export function ChoreRow({ chore, onToggle, onTake, className, decorative }: ChoreRowProps) {
   const done = !!chore.done
   return (
     <div className={cx('relative flex min-h-(--size-row) items-start gap-3 bg-surface px-4 py-3', className)}>
@@ -28,6 +30,7 @@ export function ChoreRow({ chore, onToggle, onTake, className }: ChoreRowProps) 
         role="checkbox"
         aria-checked={done}
         aria-label={`Mark done: ${chore.title}`}
+        tabIndex={decorative ? -1 : undefined}
         onClick={() => {
           if (!done) navigator.vibrate?.(10)
           onToggle?.(!done)

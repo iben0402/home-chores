@@ -1,34 +1,51 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { authErrorMessage, errorCode, type AuthErrorField } from '../../data/auth'
 
 export type FieldErrors = Partial<Record<AuthErrorField, string>>
+type Kind = 'form' | 'google'
 
 /**
- * Runs one auth request at a time (repeat submits while busy are ignored) and turns
- * Firebase errors into copy-sheet messages keyed by field.
+ * Runs auth requests for one form and turns Firebase errors into copy-sheet messages by field.
+ * - While the form request runs, repeat submits and Google are ignored.
+ * - A form submit may replace a pending Google popup (Firebase takes ~10s to report a closed
+ *   popup); the stale popup's late result is then ignored.
+ * - After errors appear, focus moves to the first invalid field so it is announced.
  */
 export function useSubmit() {
-  const [busy, setBusy] = useState<false | 'form' | 'google'>(false)
+  const [busy, setBusy] = useState<false | Kind>(false)
   const [errors, setErrors] = useState<FieldErrors>({})
-  const inFlight = useRef(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const current = useRef<{ id: number; kind: Kind } | null>(null)
+  const lastId = useRef(0)
 
-  async function run(kind: 'form' | 'google', request: () => Promise<void>): Promise<boolean> {
-    if (inFlight.current) return false
-    inFlight.current = true
+  useEffect(() => {
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+  }, [errors])
+
+  async function run(kind: Kind, request: () => Promise<void>): Promise<boolean> {
+    const active = current.current
+    if (active && (active.kind === 'form' || kind === 'google')) return false
+    const id = ++lastId.current
+    current.current = { id, kind }
+    const isCurrent = () => current.current?.id === id
     setBusy(kind)
     setErrors({})
     try {
       await request()
-      return true
+      return isCurrent()
     } catch (error) {
-      const { field, message } = authErrorMessage(errorCode(error))
-      setErrors({ [field]: message })
+      if (isCurrent()) {
+        const { field, message } = authErrorMessage(errorCode(error))
+        setErrors({ [field]: message })
+      }
       return false
     } finally {
-      inFlight.current = false
-      setBusy(false)
+      if (isCurrent()) {
+        current.current = null
+        setBusy(false)
+      }
     }
   }
 
-  return { busy, errors, setErrors, run }
+  return { busy, errors, setErrors, run, formRef }
 }

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
+import { safeNext } from '../../app/safeNext'
 import { Button } from '../../components/Button'
 import { GoogleSignInButton } from '../../components/GoogleSignInButton'
 import { OrDivider } from '../../components/OrDivider'
@@ -8,6 +9,7 @@ import { TextField } from '../../components/TextField'
 import { signInWithGoogle, signUp } from '../../data/auth'
 import { AuthLayout } from './AuthLayout'
 import { BackBar, FooterLink, FormError } from './parts'
+import { useAuth } from './useAuth'
 import { useSubmit } from './useSubmit'
 
 const EMAIL_IN_USE = 'There’s already an account with this email.'
@@ -18,11 +20,12 @@ export function SignUpPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const { busy, errors, setErrors, run } = useSubmit()
+  const { busy, errors, setErrors, run, formRef } = useSubmit()
+  const { user, loading } = useAuth()
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
-    if (busy) return
+    if (busy === 'form') return
     const invalid = {
       name: name.trim() ? undefined : 'Add your name so your household knows who’s who.',
       email: email.trim() ? undefined : 'Enter your email.',
@@ -32,6 +35,10 @@ export function SignUpPage() {
     void run('form', () => signUp({ name, email, password }))
   }
 
+  if (loading) return null
+  // Wait for our own sign-up to finish (name saved) before moving on.
+  if (user && !busy) return <Navigate to={safeNext(params.get('next'))} replace />
+
   return (
     <AuthLayout>
       <BackBar />
@@ -40,8 +47,8 @@ export function SignUpPage() {
         <p className="m-0 text-body text-fg-muted">You’ll set up or join a household next.</p>
       </div>
       <div className="min-h-4 flex-1" />
-      <form aria-label="Create account" noValidate onSubmit={onSubmit} className="flex shrink-0 flex-col gap-3 px-4 pb-4">
-        <GoogleSignInButton loading={busy === 'google'} onClick={() => void run('google', signInWithGoogle)} />
+      <form aria-label="Create account" ref={formRef} noValidate onSubmit={onSubmit} className="flex shrink-0 flex-col gap-3 px-4 pb-4">
+        <GoogleSignInButton loading={busy === 'google'} disabled={busy === 'form'} onClick={() => void run('google', signInWithGoogle)} />
         <FormError message={errors.form} />
         <OrDivider />
         <TextField

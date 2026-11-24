@@ -1,10 +1,7 @@
 import { Navigate, Outlet, useLocation, useSearchParams } from 'react-router'
 import { useAuth } from '../features/auth/useAuth'
+import { safeNext } from './safeNext'
 
-/** Only same-site paths: "/h/abc" yes; "//evil.example", "/\evil", "https://…" no. */
-export function safeNext(next: string | null): string {
-  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/'
-}
 
 /** Signed-out visitors go to /login, remembering where they were headed. */
 export function RequireAuth() {

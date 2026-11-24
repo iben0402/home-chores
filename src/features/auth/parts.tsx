@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { Icon } from '../../components/Icon'
 import { IconButton } from '../../components/IconButton'
 
@@ -39,12 +39,14 @@ export function FormError({ message }: { message?: string }) {
 
 export function BackBar({ fallback = '/login' }: { fallback?: string }) {
   const navigate = useNavigate()
+  // "default" = this is the first page of the app in this tab, so Back would leave the app.
+  const opened = useLocation().key === 'default'
   return (
     <div className="flex h-(--size-header) shrink-0 items-center px-2">
       <IconButton
         icon="chevron-left"
         label="Back"
-        onClick={() => (window.history.length > 1 ? navigate(-1) : navigate(fallback))}
+        onClick={() => (opened ? navigate(fallback) : navigate(-1))}
       />
     </div>
   )

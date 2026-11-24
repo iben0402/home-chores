@@ -1,7 +1,8 @@
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
-import { authErrorMessage, signUp } from './auth'
+import { createUserWithEmailAndPassword, onAuthStateChanged, updateProfile } from 'firebase/auth'
+import { authErrorMessage, signUp, watchAuth } from './auth'
 
-vi.mock('../lib/firebase', () => ({ auth: { currentUser: null } }))
+const fakeAuth = vi.hoisted(() => ({ currentUser: null as unknown }))
+vi.mock('../lib/firebase', () => ({ auth: fakeAuth }))
 vi.mock('firebase/auth', () => ({
   createUserWithEmailAndPassword: vi.fn(),
   updateProfile: vi.fn(),
@@ -10,6 +11,7 @@ vi.mock('firebase/auth', () => ({
   sendPasswordResetEmail: vi.fn(),
   signOut: vi.fn(),
   GoogleAuthProvider: vi.fn(),
+  onAuthStateChanged: vi.fn(() => () => {}),
 }))
 
 describe('authErrorMessage', () => {
@@ -42,5 +44,23 @@ describe('signUp', () => {
     expect(vi.mocked(updateProfile).mock.invocationCallOrder[0]).toBeGreaterThan(
       vi.mocked(createUserWithEmailAndPassword).mock.invocationCallOrder[0],
     )
+  })
+})
+
+describe('watchAuth', () => {
+  test('reports the name once sign-up has saved it', async () => {
+    const user = { uid: 'u1', email: 'anna@example.com', displayName: null as string | null, reload: vi.fn() }
+    vi.mocked(createUserWithEmailAndPassword).mockResolvedValue({ user } as never)
+    vi.mocked(updateProfile).mockImplementation(async (_u, profile) => {
+      user.displayName = profile.displayName ?? null
+    })
+    fakeAuth.currentUser = user
+    const seen: Array<string | null | undefined> = []
+    const stop = watchAuth((u) => seen.push(u?.displayName))
+    expect(onAuthStateChanged).toHaveBeenCalled()
+    await signUp({ name: 'Anna Nowak', email: 'anna@example.com', password: 'kitchen-24' })
+    expect(user.reload).toHaveBeenCalled()
+    expect(seen.at(-1)).toBe('Anna Nowak')
+    stop()
   })
 })

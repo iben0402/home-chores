@@ -27,10 +27,11 @@ export const routes: RouteObject[] = [
         element: <RedirectIfAuthed />,
         children: [
           { path: '/login', element: <LoginPage /> },
-          { path: '/signup', element: <SignUpPage /> },
           { path: '/forgot', element: <ForgotPage /> },
         ],
       },
+      // Redirects signed-in visitors itself, once its own sign-up has finished.
+      { path: '/signup', element: <SignUpPage /> },
       // Public: the invite flow handles signed-out visitors itself (later plan).
       { path: '/join/:code', element: <Placeholder title="Join household" /> },
       {
