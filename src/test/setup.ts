@@ -68,3 +68,17 @@ vi.mock('../data/chores', async (importOriginal) => {
     takeOccurrence: vi.fn(),
   }
 })
+
+// History: empty; tests override.
+vi.mock('../data/history', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../data/history')>()
+  return {
+    ...real,
+    watchHistory: vi.fn((_db, _hid, cb) => {
+      cb([])
+      return () => {}
+    }),
+    undoFromHistory: vi.fn(),
+    deleteEntry: vi.fn(),
+  }
+})
