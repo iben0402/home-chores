@@ -170,3 +170,12 @@ export function previewDates(form: ScheduleForm, today: string, n = 3): string[]
   }
   return []
 }
+
+/** The schedule editor's state for an existing rule (editing a chore). */
+export function formFromRule(rule: ChoreRule): ScheduleForm {
+  const base: ScheduleForm = { mode: 'once', every: 1, unit: 'weeks', calMode: 'week', days: ['mon'], dom: 1 }
+  if (rule.kind === 'interval') return { ...base, mode: 'after', every: rule.every, unit: `${rule.unit}s` as ScheduleForm['unit'] }
+  if (rule.kind === 'calendar' && rule.freq === 'monthly') return { ...base, mode: 'calendar', calMode: 'month', dom: rule.dayOfMonth }
+  if (rule.kind === 'calendar') return { ...base, mode: 'calendar', calMode: 'week', days: DAYS.filter((d) => rule.weekdays.includes(d.index)).map((d) => d.key) }
+  return base
+}

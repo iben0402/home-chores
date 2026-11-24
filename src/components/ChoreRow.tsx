@@ -19,6 +19,10 @@ type ChoreRowProps = {
   chore: ChoreRowData
   onToggle?: (checked: boolean) => void
   onTake?: () => void
+  /** Tap the row: the actions sheet. */
+  onOpen?: () => void
+  /** Tap the assignee: reassign. */
+  onAssignee?: () => void
   className?: string
   /** Example rows (e.g. the Welcome preview): not focusable, so they never look like real controls. */
   decorative?: boolean
@@ -27,7 +31,7 @@ type ChoreRowProps = {
 }
 
 /** One chore: what (title), where/when (room + due badge), whose (avatar or Take it). */
-export function ChoreRow({ chore, onToggle, onTake, className, decorative, leaving }: ChoreRowProps) {
+export function ChoreRow({ chore, onToggle, onTake, onOpen, onAssignee, className, decorative, leaving }: ChoreRowProps) {
   const done = !!chore.done
   return (
     <div
@@ -38,6 +42,14 @@ export function ChoreRow({ chore, onToggle, onTake, className, decorative, leavi
         className,
       )}
     >
+      {onOpen && (
+        <button
+          type="button"
+          aria-label={`${chore.title}. More actions`}
+          onClick={onOpen}
+          className="absolute inset-0 cursor-pointer hover:bg-surface-hover active:bg-surface-sunken focus-visible:-outline-offset-[3px]"
+        />
+      )}
       <button
         type="button"
         role="checkbox"
@@ -48,7 +60,7 @@ export function ChoreRow({ chore, onToggle, onTake, className, decorative, leavi
           if (!done) navigator.vibrate?.(10)
           onToggle?.(!done)
         }}
-        className="group relative -m-2.5 -mt-2 inline-flex size-(--size-touch) shrink-0 cursor-pointer items-center justify-center rounded-full"
+        className="group relative z-[1] -m-2.5 -mt-2 inline-flex size-(--size-touch) shrink-0 cursor-pointer items-center justify-center rounded-full"
       >
         <span
           className={cx(
@@ -64,7 +76,7 @@ export function ChoreRow({ chore, onToggle, onTake, className, decorative, leavi
           </span>
         )}
       </button>
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-px">
+      <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-1.5 pt-px">
         <span className={cx('line-clamp-2 text-body-medium transition-colors duration-(--duration-base) [overflow-wrap:anywhere]', done ? 'text-fg-muted' : 'text-fg')}>
           {chore.title}
         </span>
@@ -80,9 +92,20 @@ export function ChoreRow({ chore, onToggle, onTake, className, decorative, leavi
           {chore.from && <span>from {chore.from}</span>}
         </span>
       </div>
-      <div className="flex shrink-0 items-center self-center">
+      <div className="relative z-[1] flex shrink-0 items-center self-center">
         {chore.assignee ? (
-          <Avatar name={chore.assignee.you ? `${chore.assignee.name} (you)` : chore.assignee.name} color={chore.assignee.color} />
+          onAssignee ? (
+            <button
+              type="button"
+              aria-label={`Assigned to ${chore.assignee.you ? 'you' : chore.assignee.name}. Change`}
+              onClick={onAssignee}
+              className="-m-1.5 inline-flex size-(--size-touch) cursor-pointer items-center justify-center rounded-full"
+            >
+              <Avatar name={chore.assignee.name} color={chore.assignee.color} />
+            </button>
+          ) : (
+            <Avatar name={chore.assignee.you ? `${chore.assignee.name} (you)` : chore.assignee.name} color={chore.assignee.color} />
+          )
         ) : (
           onTake && (
             <Button variant="take" size="sm" icon="hand" onClick={onTake} aria-label={`Take it: ${chore.title}`}>

@@ -16,7 +16,7 @@ import {
   type Firestore,
   type Unsubscribe,
 } from 'firebase/firestore'
-import { initialDates, redate, topUpDate, type ChoreRule } from '../lib/schedule'
+import { initialDates, redate, todayISO, topUpDate, type ChoreRule } from '../lib/schedule'
 
 // Chore + occurrence data access (spec §7–§9). Takes the Firestore instance first (see households.ts).
 
@@ -76,7 +76,7 @@ export async function createChore(
   db: Firestore,
   hid: string,
   user: Person,
-  input: { title: string; description?: string; roomId: string; rule: ChoreRule; startISO: string },
+  input: { title: string; description?: string; roomId: string; rule: ChoreRule; startISO: string; assigneeUid?: string | null },
 ): Promise<string> {
   const title = input.title.trim()
   const count = input.rule.kind === 'oneoff' ? 1 : LOOKAHEAD
@@ -104,7 +104,8 @@ export async function createChore(
       seq,
       dueDate,
       status: 'open',
-      assigneeUid: null,
+      // "For" / "Who does the first one?" applies to the first occurrence only.
+      ...(seq === 0 && input.assigneeUid ? { assigneeUid: input.assigneeUid, assignedBy: user.uid } : { assigneeUid: null }),
       createdBy: user.uid,
       createdByName: user.displayName,
     })
@@ -187,6 +188,141 @@ export async function undoCompletion(db: Firestore, hid: string, token: UndoToke
       tx.update(choreRef, { nextSeq: chore.nextSeq - 1, lastDoneAt: token.previousLastDoneAt })
     }
   })
+}
+
+/** Assign an open occurrence to someone (anyone may), or to nobody (yourself, or an admin for anyone). */
+export async function assignOccurrence(db: Firestore, hid: string, occurrenceId: string, assigneeUid: string | null, byUid: string): Promise<void> {
+  await updateDoc(doc(occurrencesOf(db, hid), occurrenceId), { assigneeUid, assignedBy: byUid })
+}
+
+export type Chore = {
+  id: string
+  title: string
+  description: string
+  roomId: string
+  kind: ChoreKind
+  rule: ChoreRule
+  lookahead: number
+  nextSeq: number
+  archived: boolean
+  createdBy: string
+  createdByName: string
+  lastDoneAt: Date | null
+}
+
+export function toChore(id: string, data: Record<string, unknown>): Chore {
+  return {
+    id,
+    title: data.title as string,
+    description: (data.description as string) ?? '',
+    roomId: data.roomId as string,
+    kind: data.kind as ChoreKind,
+    rule: ruleOf(data),
+    lookahead: (data.lookahead as number) ?? 1,
+    nextSeq: (data.nextSeq as number) ?? 0,
+    archived: data.archived === true,
+    createdBy: data.createdBy as string,
+    createdByName: (data.createdByName as string) ?? '',
+    lastDoneAt: (data.lastDoneAt as Timestamp | undefined)?.toDate?.() ?? null,
+  }
+}
+
+/** Live single chore (null if deleted). */
+export function watchChore(db: Firestore, hid: string, choreId: string, onChange: (chore: Chore | null) => void, onError?: (e: Error) => void): Unsubscribe {
+  return onSnapshot(doc(choresOf(db, hid), choreId), (snap) => onChange(snap.exists() ? toChore(snap.id, snap.data()) : null), onError)
+}
+
+/**
+ * Edit a chore (spec §8.6) in one batch. Words and room are copied to its open occurrences.
+ * One-offs: `dueDate` moves its occurrence. Repeating (admin): a new schedule or length re-dates the
+ * open occurrences in seq order (assignees stay in their place) and adds or removes from the end.
+ */
+export async function updateChore(
+  db: Firestore,
+  hid: string,
+  choreId: string,
+  changes: { title?: string; description?: string; roomId?: string; dueDate?: string; rule?: ChoreRule; lookahead?: number },
+  today: string,
+): Promise<void> {
+  const choreRef = doc(choresOf(db, hid), choreId)
+  const choreSnap = await getDoc(choreRef)
+  if (!choreSnap.exists()) throw new Error('This chore no longer exists.')
+  const chore = toChore(choreId, choreSnap.data())
+  const open = (await getDocs(query(occurrencesOf(db, hid), where('choreId', '==', choreId), where('status', '==', 'open')))).docs.sort((a, b) => a.data().seq - b.data().seq)
+
+  const title = changes.title?.trim() ?? chore.title
+  const roomId = changes.roomId ?? chore.roomId
+  const batch = writeBatch(db)
+  const choreUpdate: Record<string, unknown> = {}
+  if (changes.title !== undefined) choreUpdate.title = title
+  if (changes.description !== undefined) choreUpdate.description = changes.description.trim()
+  if (changes.roomId !== undefined) choreUpdate.roomId = roomId
+
+  const scheduleChanged = chore.kind !== 'oneoff' && (changes.rule !== undefined || changes.lookahead !== undefined)
+  if (!scheduleChanged) {
+    if (Object.keys(choreUpdate).length) batch.update(choreRef, choreUpdate)
+    for (const o of open) {
+      const occUpdate: Record<string, unknown> = {}
+      if (o.data().choreTitle !== title) occUpdate.choreTitle = title
+      if (o.data().roomId !== roomId) occUpdate.roomId = roomId
+      if (chore.kind === 'oneoff' && changes.dueDate && o.data().dueDate !== changes.dueDate) occUpdate.dueDate = changes.dueDate
+      if (Object.keys(occUpdate).length) batch.update(o.ref, occUpdate)
+    }
+    await batch.commit()
+    return
+  }
+
+  const rule = changes.rule ?? chore.rule
+  const lookahead = changes.lookahead ?? chore.lookahead
+  // Interval: count from the last completion, else from the current first due date. Calendar: from today.
+  const lastDone = chore.lastDoneAt ? todayISO(chore.lastDoneAt) : null
+  const start =
+    rule.kind === 'interval'
+      ? lastDone
+        ? (redate(rule, lastDone, 1) ?? [today])[0]
+        : (open[0]?.data().dueDate as string | undefined) ?? today
+      : today
+  const dates = initialDates(rule, start, lookahead)
+  Object.assign(choreUpdate, ruleFields(rule), { lookahead })
+
+  let nextSeq = chore.nextSeq
+  dates.forEach((dueDate, i) => {
+    const existing = open[i]
+    if (existing) {
+      batch.update(existing.ref, { dueDate, choreTitle: title, roomId })
+    } else {
+      batch.set(doc(occurrencesOf(db, hid)), {
+        choreId, choreTitle: title, roomId, kind: rule.kind, seq: nextSeq, dueDate,
+        status: 'open', assigneeUid: null, createdBy: chore.createdBy, createdByName: chore.createdByName,
+      })
+      nextSeq += 1
+    }
+  })
+  open.slice(dates.length).forEach((o) => batch.delete(o.ref))
+  choreUpdate.nextSeq = nextSeq
+  if (rule.kind !== chore.kind) open.slice(0, dates.length).forEach((o) => batch.update(o.ref, { kind: rule.kind }))
+  if (rule.kind === 'calendar' && chore.kind === 'interval') choreUpdate.interval = deleteField()
+  if (rule.kind === 'interval' && chore.kind === 'calendar') choreUpdate.calendar = deleteField()
+  batch.update(choreRef, choreUpdate)
+  await batch.commit()
+}
+
+/** Delete a chore and its open occurrences (done ones stay in History). Admin, or a one-off's creator. */
+export async function deleteChore(db: Firestore, hid: string, choreId: string): Promise<void> {
+  const open = await getDocs(query(occurrencesOf(db, hid), where('choreId', '==', choreId), where('status', '==', 'open')))
+  const batch = writeBatch(db)
+  open.docs.forEach((o) => batch.delete(o.ref))
+  batch.delete(doc(choresOf(db, hid), choreId))
+  await batch.commit()
+}
+
+/** Admin: archive a repeating chore — its upcoming occurrences go; the chore and its history stay. */
+export async function archiveChore(db: Firestore, hid: string, choreId: string): Promise<void> {
+  const open = await getDocs(query(occurrencesOf(db, hid), where('choreId', '==', choreId), where('status', '==', 'open')))
+  const batch = writeBatch(db)
+  open.docs.forEach((o) => batch.delete(o.ref))
+  batch.update(doc(choresOf(db, hid), choreId), { archived: true })
+  await batch.commit()
 }
 
 /** "Take it": assign an unassigned open occurrence to yourself. */

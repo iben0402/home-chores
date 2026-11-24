@@ -129,6 +129,7 @@ describe('New chore', () => {
       roomId: 'kitchen',
       rule: { kind: 'oneoff' },
       startISO: today,
+      assigneeUid: null,
     })
     await waitFor(() => expect(router.state.location.pathname).toBe('/h/h1'))
   })

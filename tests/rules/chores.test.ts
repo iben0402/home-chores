@@ -121,17 +121,16 @@ describe('completing and undo', () => {
 })
 
 describe('tampering is refused', () => {
-  test('completing as someone else, undoing someone else’s, taking for someone else, or re-assigning', async () => {
+  test('completing as someone else, undoing someone else’s, or signing an assignment as someone else', async () => {
     const { hid, kitchen } = await setup()
     const choreId = await createChore(dbAs(env, 'alice'), hid, ALICE, { title: 'Vacuuming', roomId: kitchen, rule: WEEKLY, startISO: '2026-11-24' })
     const [first, second] = await openOccurrences('bob', hid, choreId)
     const bob = dbAs(env, 'bob')
     const ref = (id: string) => doc(bob, 'households', hid, 'occurrences', id)
     await assertFails(updateDoc(ref(first.id), { status: 'done', doneBy: 'alice', doneByName: 'Alice', doneAt: serverTimestamp() }))
-    await assertFails(updateDoc(ref(first.id), { assigneeUid: 'alice', assignedBy: 'bob' }))
+    // Anyone may assign anyone (spec §8.4), but only signed as themselves.
+    await assertFails(updateDoc(ref(first.id), { assigneeUid: 'alice', assignedBy: 'alice' }))
     await assertSucceeds(takeOccurrence(bob, hid, second.id, 'bob'))
-    await joinHousehold(dbAs(env, 'carol'), { uid: 'carol', displayName: 'Carol' }, 'K7QM4XRT', hid)
-    await assertFails(takeOccurrence(dbAs(env, 'carol'), hid, second.id, 'carol')) // already taken (by a member, not an admin)
     await assertFails(updateDoc(ref(first.id), { choreTitle: 'Renamed' }))
     const token = await completeOccurrence(dbAs(env, 'alice'), hid, first.id, ALICE, '2026-11-24')
     await assertFails(undoCompletion(bob, hid, token))
