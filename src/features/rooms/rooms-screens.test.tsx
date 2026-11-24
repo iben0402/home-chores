@@ -55,6 +55,13 @@ describe('Rooms tab', () => {
     expect(screen.getByRole('link', { name: 'Add chore to Kitchen' })).toHaveAttribute('href', '/h/h1/chores/new?room=kitchen')
   })
 
+  test('sub-pages show the back bar instead of the household header', () => {
+    renderApp('/h/h1/rooms/kitchen', ANNA)
+    expect(screen.queryByText('Flat on Main St')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument()
+  })
+
   test('an unknown room says so', () => {
     renderApp('/h/h1/rooms/nope', ANNA)
     expect(screen.getByRole('heading', { name: 'We couldn’t find that' })).toBeInTheDocument()

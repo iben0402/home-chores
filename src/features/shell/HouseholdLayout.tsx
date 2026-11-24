@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Outlet, useParams } from 'react-router'
+import { Navigate, Outlet, useLocation, useParams } from 'react-router'
 import { AppHeader } from '../../components/AppHeader'
 import { OfflineNotice } from '../../components/OfflineNotice'
 import { TabBar } from '../../components/TabBar'
@@ -23,6 +23,8 @@ function HouseholdLayout() {
   const { user } = useAuth()
   const [household, setHousehold] = useState<Household | null | undefined>(undefined)
   const [member, setMember] = useState<boolean | undefined>(undefined)
+  // Tab screens show the household header; sub-pages (a room, Manage rooms, a chore) have their own back bar.
+  const subPage = /^\/h\/[^/]+\/(rooms|chores)\/.+/.test(useLocation().pathname)
 
   useEffect(() => {
     if (!user) return
@@ -45,7 +47,7 @@ function HouseholdLayout() {
   // Content sits in the centred column; the header and tab bar span the full window width.
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-fg">
-      <AppHeader household={household.name} />
+      {!subPage && <AppHeader household={household.name} />}
       <div className="mx-auto flex w-full max-w-(--size-content) flex-1 flex-col">
         <OfflineNotice className="mx-4 mb-2" />
         <main className="flex-1">
