@@ -51,6 +51,38 @@ describe('InviteCard', () => {
 })
 
 describe('BottomSheet', () => {
+  test('is modal: the app behind it is inert, and it has a Close button', async () => {
+    const user = userEvent.setup()
+    const root = document.createElement('div')
+    root.id = 'root'
+    document.body.appendChild(root)
+    const onClose = vi.fn()
+    const { unmount } = render(
+      <BottomSheet title="Invite someone" onClose={onClose}>
+        <p>Body</p>
+      </BottomSheet>,
+      { container: root },
+    )
+    expect(root.inert).toBe(true)
+    expect(root.contains(screen.getByRole('dialog', { name: 'Invite someone' }))).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onClose).toHaveBeenCalled()
+    unmount()
+    expect(root.inert).toBe(false)
+    root.remove()
+  })
+
+  test('Escape closes even when focus is elsewhere', () => {
+    const onClose = vi.fn()
+    render(
+      <BottomSheet title="Invite someone" onClose={onClose}>
+        <p>Body</p>
+      </BottomSheet>,
+    )
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalled()
+  })
+
   test('is a dialog, takes focus and closes on Escape', () => {
     const onClose = vi.fn()
     render(

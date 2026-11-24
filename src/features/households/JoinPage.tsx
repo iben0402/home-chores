@@ -18,6 +18,7 @@ import { useAuth } from '../auth/useAuth'
 import { useSubmit } from '../auth/useSubmit'
 import { inviteError } from './inviteMessages'
 import { JoinCodePage } from './JoinCodePage'
+import { NamePrompt } from './NamePrompt'
 
 type Loaded =
   | { kind: 'loading' }
@@ -59,6 +60,7 @@ export function JoinPage() {
   }
   if (state.kind === 'signed-out') return <InvitedSignedOut householdName={state.householdName} code={code} />
   if (state.kind === 'error') return <JoinCodePage initialCode={code} />
+  if (!user?.displayName?.trim()) return <NamePrompt />
   return <JoinConfirm code={code} hid={state.hid} name={state.name} members={state.members} />
 }
 

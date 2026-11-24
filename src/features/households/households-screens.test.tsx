@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { signOut, updateDisplayName } from '../../data/auth'
 import {
@@ -7,6 +7,7 @@ import {
   getHouseholdPreview,
   isMember,
   joinHousehold,
+  watchHousehold,
   watchMembership,
   watchMyHouseholds,
 } from '../../data/households'
@@ -175,6 +176,49 @@ describe('Invite link /join/:code', () => {
     renderApp('/join/K7QM4XRT', ANNA)
     expect(await screen.findByText('That code has been replaced with a new one. Ask for the latest code.')).toBeInTheDocument()
     expect(screen.getByLabelText('Invite code')).toHaveValue('K7QM-4XRT')
+  })
+})
+
+describe('review fixes', () => {
+  test('I2: no name → asked for one before joining from an invite link', async () => {
+    vi.mocked(findInvite).mockResolvedValue({ status: 'ok', householdId: 'h1', householdName: 'Flat on Main St' })
+    vi.mocked(isMember).mockResolvedValue(false)
+    vi.mocked(getHouseholdPreview).mockResolvedValue({ name: 'Flat on Main St', members: [] })
+    renderApp('/join/K7QM4XRT', { ...ANNA, displayName: null })
+    expect(await screen.findByRole('heading', { name: 'What should we call you?' })).toBeInTheDocument()
+    expect(joinHousehold).not.toHaveBeenCalled()
+  })
+
+  test('I2: no name → asked for one before creating a household', () => {
+    renderApp('/households/new', { ...ANNA, displayName: '  ' })
+    expect(screen.getByRole('heading', { name: 'What should we call you?' })).toBeInTheDocument()
+  })
+
+  test('I2: name fields stop at 80 characters', () => {
+    renderApp('/start', { ...ANNA, displayName: null })
+    expect(screen.getByLabelText('Your name')).toHaveAttribute('maxLength', '80')
+  })
+
+  test('I3: if the household list fails to load, say so instead of sending you to Get started', async () => {
+    vi.mocked(watchMyHouseholds).mockImplementation((_db, _uid, _cb, onError) => {
+      onError?.(new Error('unavailable'))
+      return () => {}
+    })
+    const { router } = renderApp('/', ANNA)
+    expect(await screen.findByRole('heading', { name: 'Something went wrong' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/')
+  })
+
+  test('I4: switching household shows the new one, not the previous one', async () => {
+    vi.mocked(watchHousehold).mockImplementation((_db, hid, cb) => {
+      cb({ id: hid, name: hid === 'h1' ? 'Flat on Main St' : 'Mum’s house', adminUids: [] })
+      return () => {}
+    })
+    const { router } = renderApp('/h/h1', ANNA)
+    expect(screen.getByText('Flat on Main St')).toBeInTheDocument()
+    await act(() => router.navigate('/h/h2'))
+    expect(screen.getByText('Mum’s house')).toBeInTheDocument()
+    expect(screen.queryByText('Flat on Main St')).not.toBeInTheDocument()
   })
 })
 

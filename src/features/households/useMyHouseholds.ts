@@ -3,17 +3,20 @@ import { watchMyHouseholds, type HouseholdSummary } from '../../data/households'
 import { db } from '../../lib/firebase'
 import { useAuth } from '../auth/useAuth'
 
-export function useMyHouseholds(): { households: HouseholdSummary[]; loading: boolean } {
-  const { user } = useAuth()
-  const [state, setState] = useState<{ households: HouseholdSummary[]; loading: boolean }>({ households: [], loading: true })
+type State = { households: HouseholdSummary[]; loading: boolean; error: boolean }
+
+export function useMyHouseholds(): State {
+  const uid = useAuth().user?.uid
+  const [state, setState] = useState<State>({ households: [], loading: true, error: false })
   useEffect(() => {
-    if (!user) return
+    if (!uid) return
     return watchMyHouseholds(
       db,
-      user.uid,
-      (households) => setState({ households, loading: false }),
-      () => setState({ households: [], loading: false }),
+      uid,
+      (households) => setState({ households, loading: false, error: false }),
+      // An error is not "no households": never send someone to Get started because of it.
+      () => setState((s) => ({ ...s, loading: false, error: true })),
     )
-  }, [user])
+  }, [uid])
   return state
 }

@@ -8,11 +8,17 @@ import { db } from '../../lib/firebase'
 import { setLastHousehold } from '../../lib/lastHousehold'
 import { useAuth } from '../auth/useAuth'
 
+/** A fresh layout per household, so nothing from the previous one lingers while the next loads. */
+export function HouseholdRoute() {
+  const { hid = '' } = useParams()
+  return <HouseholdLayout key={hid} />
+}
+
 /**
  * /h/:hid — the in-household shell: header with the household name, content, bottom tabs.
  * Only for members: anyone else (or someone just removed) is sent to "/".
  */
-export function HouseholdLayout() {
+function HouseholdLayout() {
   const { hid = '' } = useParams()
   const { user } = useAuth()
   const [household, setHousehold] = useState<Household | null | undefined>(undefined)
@@ -36,17 +42,18 @@ export function HouseholdLayout() {
   if (member === false || household === null) return <Navigate to="/" replace state={{ notMemberOf: hid }} />
   if (member === undefined || household === undefined) return null
 
+  // Content sits in the centred column; the header and tab bar span the full window width.
   return (
-    <div className="flex min-h-dvh flex-col items-center bg-canvas text-fg">
-      <div className="flex w-full max-w-(--size-content) flex-1 flex-col">
-        <AppHeader household={household.name} />
+    <div className="flex min-h-dvh flex-col bg-canvas text-fg">
+      <AppHeader household={household.name} />
+      <div className="mx-auto flex w-full max-w-(--size-content) flex-1 flex-col">
         <OfflineNotice className="mx-4 mb-2" />
         <main className="flex-1">
           <Outlet context={household} />
         </main>
-        <div className="sticky bottom-0">
-          <TabBar hid={hid} />
-        </div>
+      </div>
+      <div className="sticky bottom-0">
+        <TabBar hid={hid} />
       </div>
     </div>
   )

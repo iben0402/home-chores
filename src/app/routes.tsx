@@ -7,7 +7,7 @@ import { CreateHouseholdPage } from '../features/households/CreateHouseholdPage'
 import { GetStartedPage } from '../features/households/GetStartedPage'
 import { JoinCodePage } from '../features/households/JoinCodePage'
 import { JoinPage } from '../features/households/JoinPage'
-import { HouseholdLayout } from '../features/shell/HouseholdLayout'
+import { HouseholdRoute } from '../features/shell/HouseholdLayout'
 import { HouseholdTabPlaceholder } from '../features/shell/HouseholdTabPlaceholder'
 import { TodayPage } from '../features/shell/TodayPage'
 import { RedirectIfAuthed, RequireAuth } from './guards'
@@ -47,7 +47,7 @@ export const routes: RouteObject[] = [
           { path: '/join', element: <JoinCodePage /> },
           {
             path: '/h/:hid',
-            element: <HouseholdLayout />,
+            element: <HouseholdRoute />,
             children: [
               { index: true, element: <TodayPage /> },
               { path: 'household', element: <HouseholdTabPlaceholder /> },

@@ -31,3 +31,10 @@ test('generateCode uses the given random source', () => {
   expect(generateCode(() => 0)).toBe('AAAAAAAA')
   expect(generateCode(() => 0.9999)).toBe('99999999')
 })
+
+test.each([
+  ['https://home-chores-9a50e.web.app/join/K7QM4XRT', 'K7QM4XRT'],
+  ['Join us: http://localhost:5173/join/k7qm-4xrt', 'K7QM4XRT'],
+])('normalizeCode extracts the code from a pasted invite link: %j', (input, expected) => {
+  expect(normalizeCode(input)).toBe(expected)
+})

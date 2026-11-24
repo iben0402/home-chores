@@ -8,9 +8,13 @@ export function generateCode(random: () => number = secureRandom): string {
   return code
 }
 
-/** "k7qm 4xrt" / "K7QM-4XRT" → "K7QM4XRT". Dashes, spaces and other characters don't matter. */
+/**
+ * "k7qm 4xrt" / "K7QM-4XRT" → "K7QM4XRT". Dashes, spaces and other characters don't matter,
+ * and a pasted invite link ("…/join/K7QM4XRT") gives its code.
+ */
 export function normalizeCode(input: string): string {
-  return input.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH)
+  const fromLink = /\/join\/([A-Za-z0-9-]+)/.exec(input)?.[1]
+  return (fromLink ?? input).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH)
 }
 
 /** "K7QM4XRT" → "K7QM-4XRT"; partial codes get the dash once past 4 characters. */

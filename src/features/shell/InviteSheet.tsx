@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BottomSheet } from '../../components/BottomSheet'
 import { InviteCard } from '../../components/InviteCard'
-import type { Household } from '../../data/households'
+import { watchInviteCode, type Household } from '../../data/households'
+import { db } from '../../lib/firebase'
 
 function inviteLink(code: string): string {
   return `${window.location.origin}/join/${code}`
@@ -10,7 +11,9 @@ function inviteLink(code: string): string {
 /** "Invite people": the code to read aloud, plus copy/share of the link. */
 export function InviteSheet({ household, onClose }: { household: Household; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
-  const link = inviteLink(household.inviteCode)
+  const [code, setCode] = useState<string | null>(null)
+  useEffect(() => watchInviteCode(db, household.id, setCode, () => setCode(null)), [household.id])
+  const link = code ? inviteLink(code) : ''
 
   async function copy() {
     try {
@@ -36,7 +39,7 @@ export function InviteSheet({ household, onClose }: { household: Household; onCl
   return (
     <BottomSheet title="Invite someone" onClose={onClose}>
       <div className="px-5 pb-2">
-        <InviteCard code={household.inviteCode} copied={copied} onCopy={copy} onShare={share} />
+        {code && <InviteCard code={code} copied={copied} onCopy={copy} onShare={share} />}
       </div>
     </BottomSheet>
   )

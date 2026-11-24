@@ -158,6 +158,7 @@ To avoid clutter, the Today view shows **only the earliest open occurrence per c
 - **Invite:** each household has one active invite code: 8 characters from an alphabet without look-alike characters (no 0/O or 1/I), shown as `K7QM-4XRT`. It's stored as `invites/{code}` → `{ householdId, householdName, active }`. The share link is `/join/{code}`. Admins can regenerate the code. The old invite doc is kept with `active: false`, so someone using it is told "That code has been replaced with a new one." and not "doesn't match". Codes don't expire on their own.
 - **Join preview (decided 2026-11-24):** before joining, the confirmation screen shows the household name and its members' first names, avatars and Admin badges. Without a server, the rules let **any signed-in user who knows a household's ID** read the household doc and its members. Household IDs are random and only reachable through an invite code, and member docs hold no emails. A Cloud Function (Blaze) would be the stricter alternative.
 - **Member colours:** each member doc gets `color` 1–10 (the design system's member identity colours). It's the lowest colour not already used in the household, or `(count % 10) + 1` once all are taken. A rare duplicate from two people joining at the same moment is acceptable.
+- **Revoking access (review fix, 2026-11-24):** the current code lives only in `households/{hid}/private/invite` (members only), never on the public household or member docs. A replaced invite keeps only `active: false`, so it no longer reveals its household. Admin powers need membership too: an admin who leaves or is removed comes off `adminUids` in the same batch, and the last admin can't leave.
 - **Join:** a signed-in user opens `/join/{code}`. The app reads the invite to get the household ID, then creates `households/{hid}/members/{uid}`. Rules allow creating your *own* member doc only when the invite's `householdId` matches. If you aren't signed in, the link sends you to login or signup and then returns you to the join page.
 - **Remove a member or leave:** one batch deletes the member doc, removes the user from `adminUids` if they're an admin, and unassigns all their **open** occurrences. Their past completions stay in history under the name repeated on each occurrence.
 - **Promote or demote:** edits `household.adminUids`. Rules forbid an empty `adminUids`.
@@ -216,20 +217,25 @@ invites/{code}
   createdBy: string
   createdAt: Timestamp
 
-households/{hid}
+households/{hid}               // readable by any signed-in user (join preview): holds no code
   name: string
-  adminUids: string[]          // the only place roles are stored
-  inviteCode: string
+  adminUids: string[]          // the only place roles are stored; every admin must be a member
   createdBy: string
   createdAt: Timestamp
+
+households/{hid}/private/invite   // members only
+  code: string                 // the current invite code
+
+households/{hid}/joins/{uid}   // proof of the code someone joined with; admins only
+  inviteCode: string
 
 households/{hid}/members/{uid}
   uid: string                  // repeats the doc ID so collection-group queries can filter on it
   displayName: string
   color: number                // 1–10, member identity colour (see §8.7)
   photoURL?: string
-  joinedAt: Timestamp
-  inviteCode?: string          // the code used to join; checked by rules on create
+  joinedAt: Timestamp          // = request.time
+  photoURL?: string
 
 households/{hid}/rooms/{roomId}
   name: string

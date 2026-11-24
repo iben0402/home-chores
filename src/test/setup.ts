@@ -17,9 +17,15 @@ vi.mock('../data/households', async (importOriginal) => {
       return () => {}
     }),
     watchHousehold: vi.fn((_db, hid, cb) => {
-      cb({ id: hid, name: 'Flat on Main St', adminUids: ['u1'], inviteCode: 'K7QM4XRT' })
+      cb({ id: hid, name: 'Flat on Main St', adminUids: ['u1'] })
       return () => {}
     }),
+    watchInviteCode: vi.fn((_db, _hid, cb) => {
+      cb('K7QM4XRT')
+      return () => {}
+    }),
+    regenerateInviteCode: vi.fn(),
+    removeMember: vi.fn(),
     watchMembership: vi.fn((_db, _hid, _uid, cb) => {
       cb(true)
       return () => {}

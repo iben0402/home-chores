@@ -6,13 +6,12 @@ import { signOut } from '../../data/auth'
 import { firstName } from '../../lib/names'
 import { AuthLayout } from '../auth/AuthLayout'
 import { useAuth } from '../auth/useAuth'
-import { NamePrompt } from './NamePrompt'
 
 /** 3 · Get started: create a household or join one. */
 export function GetStartedPage() {
   const { user } = useAuth()
   const [leaving, setLeaving] = useState(false)
-  if (!user?.displayName?.trim()) return <NamePrompt />
+  if (!user) return null
 
   return (
     <AuthLayout>

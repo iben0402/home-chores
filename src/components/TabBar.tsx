@@ -12,7 +12,8 @@ const TABS: Array<{ path: string; label: string; icon: IconName }> = [
 /** Bottom navigation: Today · Rooms · History · Household. */
 export function TabBar({ hid }: { hid: string }) {
   return (
-    <nav aria-label="Main" className="z-(--z-header) grid h-(--size-tabbar) shrink-0 grid-cols-4 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
+    <nav aria-label="Main" className="z-(--z-header) w-full shrink-0 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
+      <div className="mx-auto grid h-(--size-tabbar) max-w-(--size-content) grid-cols-4">
       {TABS.map((tab) => (
         <NavLink
           key={tab.label}
@@ -40,6 +41,7 @@ export function TabBar({ hid }: { hid: string }) {
           )}
         </NavLink>
       ))}
+      </div>
     </nav>
   )
 }

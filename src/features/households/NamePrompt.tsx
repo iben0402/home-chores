@@ -27,6 +27,7 @@ export function NamePrompt() {
         <div className="flex flex-col gap-4">
           <TextField
             label="Your name"
+          maxLength={80}
             autoComplete="name"
             placeholder="e.g. Anna Nowak"
             hint="This is what people in your household see."
