@@ -1,0 +1,68 @@
+import { deleteApp, getApps } from 'firebase/app'
+import { connectAuthEmulator } from 'firebase/auth'
+import { connectFirestoreEmulator } from 'firebase/firestore'
+import { getFirebaseConfig, initFirebase } from './firebase'
+
+vi.mock('firebase/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('firebase/auth')>()),
+  connectAuthEmulator: vi.fn(),
+}))
+vi.mock('firebase/firestore', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('firebase/firestore')>()),
+  connectFirestoreEmulator: vi.fn(),
+}))
+
+beforeEach(async () => {
+  // The module initializes a default app on import; start every test clean.
+  await Promise.all(getApps().map((a) => deleteApp(a)))
+  vi.clearAllMocks()
+})
+
+test('uses demo config when env is empty', () => {
+  const config = getFirebaseConfig({})
+  expect(config.projectId).toBe('demo-home-chores')
+  expect(config.apiKey).toEqual(expect.any(String))
+  expect(config.apiKey).not.toBe('')
+})
+
+test('uses VITE_FIREBASE_* values when provided', () => {
+  const config = getFirebaseConfig({
+    VITE_FIREBASE_API_KEY: 'key-1',
+    VITE_FIREBASE_AUTH_DOMAIN: 'real.firebaseapp.com',
+    VITE_FIREBASE_PROJECT_ID: 'real-project',
+    VITE_FIREBASE_STORAGE_BUCKET: 'real.appspot.com',
+    VITE_FIREBASE_MESSAGING_SENDER_ID: '123',
+    VITE_FIREBASE_APP_ID: '1:123:web:abc',
+  })
+  expect(config).toEqual({
+    apiKey: 'key-1',
+    authDomain: 'real.firebaseapp.com',
+    projectId: 'real-project',
+    storageBucket: 'real.appspot.com',
+    messagingSenderId: '123',
+    appId: '1:123:web:abc',
+  })
+})
+
+test('connects to emulators when useEmulators is true', () => {
+  initFirebase({ env: {}, useEmulators: true })
+  expect(connectAuthEmulator).toHaveBeenCalledWith(expect.anything(), 'http://127.0.0.1:9099', {
+    disableWarnings: true,
+  })
+  expect(connectFirestoreEmulator).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', 8080)
+})
+
+test('does not connect to emulators when useEmulators is false', () => {
+  initFirebase({ env: {}, useEmulators: false })
+  expect(connectAuthEmulator).not.toHaveBeenCalled()
+  expect(connectFirestoreEmulator).not.toHaveBeenCalled()
+})
+
+test('initializes once', () => {
+  const first = initFirebase({ env: {}, useEmulators: true })
+  const second = initFirebase({ env: {}, useEmulators: true })
+  expect(second.app).toBe(first.app)
+  expect(second.db).toBe(first.db)
+  expect(connectAuthEmulator).toHaveBeenCalledTimes(1)
+  expect(connectFirestoreEmulator).toHaveBeenCalledTimes(1)
+})
