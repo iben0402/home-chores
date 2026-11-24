@@ -11,7 +11,7 @@ export function InviteCard({ code, copied, onCopy, onShare }: { code: string; co
         aria-label={`Invite code: ${code.split('').join(' ')}`}
         className="flex select-all justify-center rounded-md bg-surface-sunken px-2 py-4 text-code tracking-[0.14em] text-fg tabular-nums"
       >
-        <span aria-hidden="true">{formatCode(code).replace('-', '')}</span>
+        <span aria-hidden="true">{formatCode(code)}</span>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="secondary" icon={copied ? 'check' : 'copy'} onClick={onCopy}>

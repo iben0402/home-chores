@@ -137,6 +137,8 @@ describe('Invite link /join/:code', () => {
   test('signed out: shows who invited you and keeps the way back', async () => {
     renderApp('/join/K7QM4XRT')
     expect(await screen.findByRole('heading', { name: 'Flat on Main St' })).toBeInTheDocument()
+    // The compact logo is not a heading: one h1 per screen.
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual(['Flat on Main St'])
     expect(screen.getByRole('link', { name: 'Log in with email' })).toHaveAttribute('href', '/login?next=%2Fjoin%2FK7QM4XRT')
     expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute('href', '/signup?next=%2Fjoin%2FK7QM4XRT')
   })

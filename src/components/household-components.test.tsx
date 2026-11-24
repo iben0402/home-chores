@@ -45,7 +45,7 @@ describe('InviteCard', () => {
   test('shows the code in groups of four and spells it for screen readers', () => {
     render(<InviteCard code="K7QM4XRT" onCopy={() => {}} onShare={() => {}} />)
     const code = screen.getByLabelText('Invite code: K 7 Q M 4 X R T')
-    expect(code).toHaveTextContent('K7QM4XRT')
+    expect(code).toHaveTextContent('K7QM-4XRT')
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeInTheDocument()
   })
 })
