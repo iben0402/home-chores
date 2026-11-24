@@ -142,7 +142,7 @@ describe('invites and joining', () => {
     const { hid, code } = await withBob()
     const alice = dbAs(env, 'alice')
     await regenerateInviteCode(alice, hid, 'alice', () => 'NEWCODE2')
-    await removeMember(alice, hid, 'bob')
+    await removeMember(alice, hid, 'bob', 'alice')
     const bob = dbAs(env, 'bob')
     // Nothing Bob can still read leads to the new code…
     expect((await getDoc(doc(bob, 'invites', code))).data()).not.toHaveProperty('householdId')
@@ -200,7 +200,7 @@ describe('roles (I1: admin powers need membership)', () => {
     const { hid } = await withBob()
     const alice = dbAs(env, 'alice')
     await assertFails(deleteDoc(doc(alice, 'households', hid, 'members', 'alice')))
-    await assertFails(removeMember(alice, hid, 'alice'))
+    await assertFails(removeMember(alice, hid, 'alice', 'alice'))
   })
 
   test('removing an admin must also take them off adminUids, in the same batch', async () => {
@@ -208,7 +208,7 @@ describe('roles (I1: admin powers need membership)', () => {
     const alice = dbAs(env, 'alice')
     await updateDoc(doc(alice, 'households', hid), { adminUids: ['alice', 'bob'] })
     await assertFails(deleteDoc(doc(alice, 'households', hid, 'members', 'bob')))
-    await assertSucceeds(removeMember(alice, hid, 'bob'))
+    await assertSucceeds(removeMember(alice, hid, 'bob', 'alice'))
     expect((await getDoc(doc(alice, 'households', hid))).data()?.adminUids).toEqual(['alice'])
   })
 
@@ -216,14 +216,14 @@ describe('roles (I1: admin powers need membership)', () => {
     const { hid } = await withBob()
     await createHousehold(dbAs(env, 'carol'), CAROL, 'Other', () => 'DDDDDDDD')
     await assertFails(deleteDoc(doc(dbAs(env, 'carol'), 'households', hid, 'members', 'bob')))
-    await assertSucceeds(removeMember(dbAs(env, 'bob'), hid, 'bob'))
+    await assertSucceeds(removeMember(dbAs(env, 'bob'), hid, 'bob', 'bob'))
   })
 
   test('a removed admin loses admin powers', async () => {
     const { hid } = await withBob()
     const alice = dbAs(env, 'alice')
     await updateDoc(doc(alice, 'households', hid), { adminUids: ['alice', 'bob'] })
-    await removeMember(alice, hid, 'bob')
+    await removeMember(alice, hid, 'bob', 'alice')
     await assertFails(updateDoc(doc(dbAs(env, 'bob'), 'households', hid), { name: 'Bob was here' }))
     await assertFails(updateDoc(doc(dbAs(env, 'bob'), 'households', hid), { adminUids: arrayRemove('alice') }))
   })
