@@ -5,7 +5,7 @@ export type Unit = 'day' | 'week' | 'month'
 export type ChoreRule =
   | { kind: 'oneoff' }
   | { kind: 'interval'; every: number; unit: Unit }
-  | { kind: 'calendar'; freq: 'weekly'; weekdays: number[] } // 0 = Sunday … 6 = Saturday
+  | { kind: 'calendar'; freq: 'weekly'; weekdays: readonly number[] } // 0 = Sunday … 6 = Saturday
   | { kind: 'calendar'; freq: 'monthly'; dayOfMonth: number }
 
 export type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
