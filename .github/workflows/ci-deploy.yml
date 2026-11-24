@@ -67,7 +67,7 @@ jobs:
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HOME_CHORES_9A50E }}
           projectId: ${{ env.FIREBASE_PROJECT }}
           expires: 7d
 
@@ -92,6 +92,6 @@ jobs:
           path: dist
       - uses: google-github-actions/auth@v3
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HOME_CHORES_9A50E }}
       - name: Deploy Hosting, Firestore rules and indexes
         run: npx firebase deploy --only hosting,firestore --project "$FIREBASE_PROJECT" --non-interactive
