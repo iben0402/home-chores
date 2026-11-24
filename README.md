@@ -85,7 +85,7 @@ npm install
 npm run dev:all     # Vite + Firebase emulators (Auth, Firestore)
 ```
 
-Local development uses the emulators with the `demo-home-chores` project, so it doesn't need a real Firebase project.
+Local development uses the emulators with the `demo-home-chores` project, so it doesn't need a real Firebase project. Even when `.env.local` holds the real config, `npm run dev` uses the emulators unless `VITE_USE_EMULATORS=false`.
 
 ```bash
 npm test            # unit tests
@@ -95,9 +95,8 @@ npm run build       # production build into dist/
 
 ### Deploying
 
-1. Create a Firebase project on the Spark plan, which is free.
-2. Enable **Authentication** with the Email/Password and Google providers.
-3. Create a **Firestore** database.
-4. Run `firebase use --add` and select the project.
-5. Copy `.env.example` to `.env.local` and fill in the web app config (`VITE_FIREBASE_*`).
-6. Run `npm run build && firebase deploy`.
+The Firebase project is `home-chores-9a50e`, the default in `.firebaserc`. Authentication (Email/Password + Google) and Firestore are enabled.
+
+1. Make sure `.env.local` has the web app config (`VITE_FIREBASE_*`, see `.env.example`). `npm run build` fails if it's missing.
+2. Run `firebase login` (once).
+3. Run `npm run build && firebase deploy`. This deploys Hosting, Firestore rules and indexes.

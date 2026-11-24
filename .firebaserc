@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-home-chores"
+    "default": "home-chores-9a50e",
+    "demo": "demo-home-chores"
   }
 }

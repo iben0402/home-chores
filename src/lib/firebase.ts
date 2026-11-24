@@ -10,9 +10,9 @@ import {
   type Firestore,
 } from 'firebase/firestore'
 
-// The only place Firebase is initialized. Everything else imports `auth` / `db` from here.
+import { missingFirebaseKeys, readEnv as read, type Env } from './firebaseEnv'
 
-type Env = Record<string, unknown>
+// The only place Firebase is initialized. Everything else imports `auth` / `db` from here.
 
 export const DEMO_PROJECT_ID = 'demo-home-chores'
 
@@ -22,15 +22,18 @@ const EMULATORS = {
   firestorePort: 8080,
 } as const
 
-function read(env: Env, key: string): string | undefined {
-  const value = env[key]
-  return typeof value === 'string' && value !== '' ? value : undefined
+/** Emulators only in dev builds, unless explicitly turned off with VITE_USE_EMULATORS=false. */
+export function shouldUseEmulators(env: Env): boolean {
+  return env.DEV === true && read(env, 'VITE_USE_EMULATORS') !== 'false'
 }
 
-/** Real config from VITE_FIREBASE_* when a project ID is set; otherwise the emulator-only demo project. */
-export function getFirebaseConfig(env: Env): FirebaseOptions {
-  const projectId = read(env, 'VITE_FIREBASE_PROJECT_ID')
-  if (!projectId) {
+/**
+ * With emulators on, ALWAYS the demo project: emulator traffic (and its browser cache) can then
+ * never be mistaken for, or flushed into, the real project. With emulators off, the real
+ * VITE_FIREBASE_* config, which must be complete.
+ */
+export function getFirebaseConfig(env: Env, opts: { useEmulators: boolean }): FirebaseOptions {
+  if (opts.useEmulators) {
     return {
       apiKey: 'demo-key',
       authDomain: `${DEMO_PROJECT_ID}.firebaseapp.com`,
@@ -38,10 +41,14 @@ export function getFirebaseConfig(env: Env): FirebaseOptions {
       appId: 'demo-app',
     }
   }
+  const missing = missingFirebaseKeys(env)
+  if (missing.length > 0) {
+    throw new Error(`Missing Firebase config: ${missing.join(', ')}. See .env.example.`)
+  }
   return {
     apiKey: read(env, 'VITE_FIREBASE_API_KEY'),
     authDomain: read(env, 'VITE_FIREBASE_AUTH_DOMAIN'),
-    projectId,
+    projectId: read(env, 'VITE_FIREBASE_PROJECT_ID'),
     storageBucket: read(env, 'VITE_FIREBASE_STORAGE_BUCKET'),
     messagingSenderId: read(env, 'VITE_FIREBASE_MESSAGING_SENDER_ID'),
     appId: read(env, 'VITE_FIREBASE_APP_ID'),
@@ -59,11 +66,12 @@ export function initFirebase(opts: { env: Env; useEmulators: boolean }): {
     return { app, auth: getAuth(app), db: getFirestore(app) }
   }
 
-  const app = initializeApp(getFirebaseConfig(opts.env))
+  const app = initializeApp(getFirebaseConfig(opts.env, { useEmulators: opts.useEmulators }))
   const auth = getAuth(app)
   const db = initializeFirestore(app, {
+    // Emulator data never goes into the persistent (IndexedDB) cache.
     localCache:
-      typeof indexedDB === 'undefined'
+      opts.useEmulators || typeof indexedDB === 'undefined'
         ? memoryLocalCache()
         : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   })
@@ -76,7 +84,6 @@ export function initFirebase(opts: { env: Env; useEmulators: boolean }): {
   return { app, auth, db }
 }
 
-export const usingEmulators =
-  import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS !== 'false'
+export const usingEmulators = shouldUseEmulators(import.meta.env)
 
 export const { app, auth, db } = initFirebase({ env: import.meta.env, useEmulators: usingEmulators })
