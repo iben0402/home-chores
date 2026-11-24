@@ -44,13 +44,15 @@ export function NewChorePage() {
   if (!rooms || !user) return null
   const room = rooms.some((r) => r.id === roomId) ? roomId : (rooms.find((r) => r.isDefault) ?? rooms[0])?.id ?? ''
   const once = !isAdmin || schedule.mode === 'once'
+  // A date is asked for one-offs (Due) and for "after it's done" chores (First due).
+  const afterDone = !once && schedule.mode === 'after'
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (busy || !user) return
     const next = {
       title: title.trim() ? undefined : 'Say what needs doing.',
-      due: once && !/^\d{4}-\d{2}-\d{2}$/.test(due) ? 'Pick a date.' : undefined,
+      due: (once || afterDone) && !/^\d{4}-\d{2}-\d{2}$/.test(due) ? 'Pick a date.' : undefined,
       schedule: !once && schedule.mode === 'calendar' && schedule.calMode === 'week' && schedule.days.length === 0 ? 'Pick at least one day.' : undefined,
     }
     setErrors(next)
@@ -65,7 +67,7 @@ export function NewChorePage() {
         description: note.trim(),
         roomId: room,
         rule: once ? { kind: 'oneoff' } : ruleFromForm(schedule),
-        startISO: once ? due : today,
+        startISO: once || afterDone ? due : today,
         assigneeUid: assignee || null,
       })
       navigate(`/h/${household.id}`, { replace: true })
@@ -94,9 +96,9 @@ export function NewChorePage() {
             <FieldMessage id="schedule-msg" error={errors.schedule} />
           </div>
         )}
-        {once && (
+        {(once || afterDone) && (
           <div className="flex flex-col gap-1.5">
-            <FieldLabel htmlFor="due">Due</FieldLabel>
+            <FieldLabel htmlFor="due">{once ? 'Due' : 'First due'}</FieldLabel>
             <input
               id="due"
               type="date"
@@ -107,7 +109,11 @@ export function NewChorePage() {
               aria-invalid={errors.due ? true : undefined}
               aria-describedby="due-msg"
             />
-            <FieldMessage id="due-msg" error={errors.due} />
+            <FieldMessage
+              id="due-msg"
+              error={errors.due}
+              hint={once ? undefined : 'The next ones follow from this date, and move when it’s done late or early.'}
+            />
           </div>
         )}
         <SelectField
