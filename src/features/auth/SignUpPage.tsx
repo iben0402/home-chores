@@ -53,6 +53,7 @@ export function SignUpPage() {
         <OrDivider />
         <TextField
           label="Your name"
+          maxLength={80}
           autoComplete="name"
           placeholder="e.g. Anna Nowak"
           hint="This is what people in your household see."

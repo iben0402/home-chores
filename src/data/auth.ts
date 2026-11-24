@@ -49,6 +49,18 @@ export async function signUp(input: { name: string; email: string; password: str
   }
 }
 
+/** Set the name housemates see (for accounts that have none yet). */
+export async function updateDisplayName(name: string): Promise<void> {
+  const user = auth.currentUser
+  if (!user) throw Object.assign(new Error('Not signed in'), { code: 'auth/no-current-user' })
+  try {
+    await updateProfile(user, { displayName: name.trim() })
+    await user.reload()
+  } finally {
+    profileListeners.forEach((listener) => listener())
+  }
+}
+
 /** Popup, not redirect: redirect breaks under browsers' third-party storage blocking. */
 export async function signInWithGoogle(): Promise<void> {
   await signInWithPopup(auth, new GoogleAuthProvider())

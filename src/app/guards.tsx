@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation, useSearchParams } from 'react-router'
 import { useAuth } from '../features/auth/useAuth'
+import { NamePrompt } from '../features/households/NamePrompt'
 import { safeNext } from './safeNext'
 
 
@@ -12,6 +13,8 @@ export function RequireAuth() {
     const target = location.pathname + location.search
     return <Navigate to={target === '/' ? '/login' : `/login?next=${encodeURIComponent(target)}`} replace />
   }
+  // Households show your name to others: never create or join one without it.
+  if (!user.displayName?.trim()) return <NamePrompt />
   return <Outlet />
 }
 
