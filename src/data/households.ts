@@ -1,5 +1,6 @@
 import {
   arrayRemove,
+  arrayUnion,
   collection,
   collectionGroup,
   doc,
@@ -8,6 +9,7 @@ import {
   onSnapshot,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
   type Firestore,
@@ -19,7 +21,7 @@ import { generateCode } from '../lib/inviteCode'
 // Household data access. Every function takes the Firestore instance first, so the same code
 // runs in the app (lib/firebase `db`) and in emulator tests. Never import lib/firebase here.
 
-export type HouseholdSummary = { id: string; name: string }
+export type HouseholdSummary = { id: string; name: string; adminUids: string[] }
 export type Household = { id: string; name: string; adminUids: string[] }
 export type MemberPreview = { uid: string; displayName: string; color: MemberColor; admin: boolean }
 export type InviteLookup =
@@ -154,12 +156,41 @@ export async function regenerateInviteCode(db: Firestore, hid: string, byUid: st
   throw new Error('Could not find a free invite code')
 }
 
-/** Leave (yourself) or remove (admin) a member. An admin is taken off adminUids in the same batch. */
-export async function removeMember(db: Firestore, hid: string, uid: string): Promise<void> {
-  const admins: string[] = (await getDoc(doc(db, 'households', hid))).data()?.adminUids ?? []
+/**
+ * Leave (yourself) or remove (admin) a member, in one batch: their open chores become unassigned,
+ * an admin is taken off adminUids, and the member doc goes. Their history stays.
+ */
+export async function removeMember(db: Firestore, hid: string, uid: string, byUid: string): Promise<void> {
+  const [household, theirs] = await Promise.all([
+    getDoc(doc(db, 'households', hid)),
+    getDocs(query(collection(db, 'households', hid, 'occurrences'), where('assigneeUid', '==', uid), where('status', '==', 'open'))),
+  ])
+  const admins: string[] = household.data()?.adminUids ?? []
   const batch = writeBatch(db)
+  theirs.docs.forEach((o) => batch.update(o.ref, { assigneeUid: null, assignedBy: byUid }))
   if (admins.includes(uid)) batch.update(doc(db, 'households', hid), { adminUids: arrayRemove(uid) })
   batch.delete(doc(db, 'households', hid, 'members', uid))
+  await batch.commit()
+}
+
+/** Admin: make someone an admin, or take the role away (the last admin can't be removed). */
+export async function setAdmin(db: Firestore, hid: string, uid: string, admin: boolean): Promise<void> {
+  await updateDoc(doc(db, 'households', hid), { adminUids: admin ? arrayUnion(uid) : arrayRemove(uid) })
+}
+
+/** Admin: rename the household, and the copy of the name on its current invite. */
+export async function renameHousehold(db: Firestore, hid: string, name: string): Promise<void> {
+  const code: string | undefined = (await getDoc(doc(db, 'households', hid, 'private', 'invite'))).data()?.code
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'households', hid), { name: name.trim() })
+  if (code) batch.update(doc(db, 'invites', code), { householdName: name.trim() })
+  await batch.commit()
+}
+
+/** Your name as housemates see it, in every household you're in. */
+export async function updateMyName(db: Firestore, uid: string, name: string, householdIds: string[]): Promise<void> {
+  const batch = writeBatch(db)
+  householdIds.forEach((hid) => batch.update(doc(db, 'households', hid, 'members', uid), { displayName: name.trim() }))
   await batch.commit()
 }
 
@@ -210,7 +241,7 @@ export function watchMyHouseholds(db: Firestore, uid: string, onChange: (househo
         onChange(
           households
             .filter((h) => h.exists())
-            .map((h) => ({ id: h.id, name: h.data()!.name as string }))
+            .map((h) => ({ id: h.id, name: h.data()!.name as string, adminUids: (h.data()!.adminUids as string[]) ?? [] }))
             .sort((a, b) => a.name.localeCompare(b.name)),
         )
       } catch (error) {
