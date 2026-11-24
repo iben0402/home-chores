@@ -93,6 +93,88 @@ service cloud.firestore {
           && getAfter(invitePath(request.resource.data.code)).data.active == true;
       }
 
+      // ---- Chores (spec §8, §10). Members: one-offs only; admins: anything. ----
+      function chorePath(choreId) { return /databases/$(database)/documents/households/$(hid)/chores/$(choreId); }
+      function roomExists(roomId) { return roomId is string && exists(/databases/$(database)/documents/households/$(hid)/rooms/$(roomId)); }
+      function validISO(d) { return d is string && d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
+
+      match /chores/{choreId} {
+        allow read: if signedIn() && isMember(hid);
+        allow create: if signedIn() && isMember(hid)
+          && request.resource.data.keys().hasOnly(['title', 'description', 'roomId', 'kind', 'interval', 'calendar', 'lookahead', 'nextSeq', 'archived', 'createdBy', 'createdByName', 'createdAt'])
+          && validName(request.resource.data.title)
+          && request.resource.data.description is string && request.resource.data.description.size() <= 1000
+          && roomExists(request.resource.data.roomId)
+          && request.resource.data.kind in ['oneoff', 'interval', 'calendar']
+          && request.resource.data.archived == false
+          && request.resource.data.createdBy == me()
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.nextSeq is int && request.resource.data.lookahead is int
+          && request.resource.data.lookahead >= 1 && request.resource.data.lookahead <= 8
+          && (isAdmin(hid) || (request.resource.data.kind == 'oneoff' && request.resource.data.nextSeq == 1));
+        allow update: if signedIn() && isMember(hid) && (
+          isAdmin(hid)
+          // The creator of a one-off may edit its words and room.
+          || (resource.data.kind == 'oneoff' && resource.data.createdBy == me()
+              && onlyChanged(['title', 'description', 'roomId']) && validName(request.resource.data.title)
+              && roomExists(request.resource.data.roomId))
+          // Completing (+1) or undoing (-1) moves the queue counter by one.
+          || (onlyChanged(['nextSeq', 'lastDoneAt'])
+              && (request.resource.data.nextSeq == resource.data.nextSeq + 1 || request.resource.data.nextSeq == resource.data.nextSeq - 1))
+        );
+        allow delete: if signedIn() && (isAdmin(hid) || (isMember(hid) && resource.data.kind == 'oneoff' && resource.data.createdBy == me()));
+      }
+
+      match /occurrences/{occId} {
+        function chore() { return get(chorePath(resource.data.choreId)).data; }
+        function newOccurrenceFields() {
+          let o = request.resource.data;
+          return o.keys().hasOnly(['choreId', 'choreTitle', 'roomId', 'kind', 'seq', 'dueDate', 'status', 'assigneeUid', 'createdBy', 'createdByName'])
+            && o.status == 'open' && o.assigneeUid == null && o.createdBy == me()
+            && o.seq is int && validISO(o.dueDate);
+        }
+        allow read: if signedIn() && isMember(hid);
+        allow create: if signedIn() && isMember(hid) && newOccurrenceFields() && (
+          isAdmin(hid)
+          // First occurrences of a chore I'm creating in this batch.
+          || (!exists(chorePath(request.resource.data.choreId))
+              && getAfter(chorePath(request.resource.data.choreId)).data.createdBy == me()
+              && request.resource.data.seq < getAfter(chorePath(request.resource.data.choreId)).data.nextSeq)
+          // Topping up a repeating chore when completing: exactly the next seq, counter moves on.
+          || (get(chorePath(request.resource.data.choreId)).data.kind != 'oneoff'
+              && request.resource.data.seq == get(chorePath(request.resource.data.choreId)).data.nextSeq
+              && getAfter(chorePath(request.resource.data.choreId)).data.nextSeq == request.resource.data.seq + 1
+              && request.resource.data.roomId == get(chorePath(request.resource.data.choreId)).data.roomId
+              && request.resource.data.choreTitle == get(chorePath(request.resource.data.choreId)).data.title)
+        );
+        allow update: if signedIn() && isMember(hid) && (
+          isAdmin(hid)
+          // Complete: as yourself, at server time.
+          || (resource.data.status == 'open' && request.resource.data.status == 'done'
+              && onlyChanged(['status', 'doneBy', 'doneByName', 'doneAt'])
+              && request.resource.data.doneBy == me() && request.resource.data.doneAt == request.time)
+          // Re-date an open occurrence (completing an "after it's done" chore moves the queue).
+          || (resource.data.status == 'open' && onlyChanged(['dueDate']) && validISO(request.resource.data.dueDate))
+          // Take it: an unassigned open occurrence, for yourself.
+          || (resource.data.status == 'open' && resource.data.assigneeUid == null
+              && onlyChanged(['assigneeUid', 'assignedBy'])
+              && request.resource.data.assigneeUid == me() && request.resource.data.assignedBy == me())
+          // Undo your own tick within 10 minutes.
+          || (resource.data.status == 'done' && resource.data.doneBy == me()
+              && request.time < resource.data.doneAt + duration.value(10, 'm')
+              && request.resource.data.status == 'open'
+              && onlyChanged(['status', 'doneBy', 'doneByName', 'doneAt'])
+              && !request.resource.data.keys().hasAny(['doneBy', 'doneByName', 'doneAt']))
+        );
+        allow delete: if signedIn() && isMember(hid) && (
+          isAdmin(hid)
+          // Undo removes the top-up it made: the newest, still open and unassigned, counter moves back.
+          || (resource.data.status == 'open' && resource.data.assigneeUid == null
+              && resource.data.seq == chore().nextSeq - 1
+              && getAfter(chorePath(resource.data.choreId)).data.nextSeq == resource.data.seq)
+        );
+      }
+
       match /rooms/{roomId} {
         allow read: if signedIn() && isMember(hid);
         // Only the household's first room (General) is the default.

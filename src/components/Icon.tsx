@@ -1,4 +1,9 @@
 import {
+  CircleCheck,
+  CircleDot,
+  Minus,
+  Repeat2,
+  Undo2,
   Bath,
   BedDouble,
   CookingPot,
@@ -46,6 +51,11 @@ import {
 
 // Lucide icons in use, by the names the design system uses. Add here as screens need more.
 const icons = {
+  'circle-check': CircleCheck,
+  'circle-dot': CircleDot,
+  'minus': Minus,
+  'repeat-2': Repeat2,
+  'undo-2': Undo2,
   'bath': Bath,
   'bed-double': BedDouble,
   'cooking-pot': CookingPot,

@@ -26,6 +26,10 @@ vi.mock('../data/households', async (importOriginal) => {
     }),
     regenerateInviteCode: vi.fn(),
     removeMember: vi.fn(),
+    watchMembers: vi.fn((_db, _hid, cb) => {
+      cb([{ uid: 'u1', displayName: 'Anna Nowak', color: 1 }])
+      return () => {}
+    }),
     watchMembership: vi.fn((_db, _hid, _uid, cb) => {
       cb(true)
       return () => {}
@@ -46,5 +50,21 @@ vi.mock('../data/rooms', async (importOriginal) => {
     updateRoom: vi.fn(),
     reorderRooms: vi.fn(),
     deleteRoom: vi.fn(),
+  }
+})
+
+// Chores: none yet; tests override.
+vi.mock('../data/chores', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../data/chores')>()
+  return {
+    ...real,
+    watchOpenOccurrences: vi.fn((_db, _hid, cb) => {
+      cb([])
+      return () => {}
+    }),
+    createChore: vi.fn(),
+    completeOccurrence: vi.fn(),
+    undoCompletion: vi.fn(),
+    takeOccurrence: vi.fn(),
   }
 })

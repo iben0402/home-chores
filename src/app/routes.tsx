@@ -10,6 +10,7 @@ import { JoinPage } from '../features/households/JoinPage'
 import { HouseholdRoute } from '../features/shell/HouseholdLayout'
 import { HouseholdTabPlaceholder } from '../features/shell/HouseholdTabPlaceholder'
 import { TodayPage } from '../features/shell/TodayPage'
+import { NewChorePage } from '../features/chores/NewChorePage'
 import { ManageRoomsPage } from '../features/rooms/ManageRoomsPage'
 import { RoomPage } from '../features/rooms/RoomPage'
 import { RoomsPage } from '../features/rooms/RoomsPage'
@@ -19,7 +20,6 @@ import Placeholder from './Placeholder'
 
 // Route table from the design spec §11. Screens not built yet are placeholders inside the shell.
 const householdScreens: Array<[path: string, title: string]> = [
-  ['chores/new', 'New chore'],
   ['chores/:choreId', 'Chore'],
   ['history', 'History'],
 ]
@@ -53,6 +53,7 @@ export const routes: RouteObject[] = [
               { index: true, element: <TodayPage /> },
               { path: 'household', element: <HouseholdTabPlaceholder /> },
               { path: 'rooms', element: <RoomsPage /> },
+              { path: 'chores/new', element: <NewChorePage /> },
               { path: 'rooms/manage', element: <ManageRoomsPage /> },
               { path: 'rooms/:roomId', element: <RoomPage /> },
               ...householdScreens.map(([path, title]) => ({ path, element: <Placeholder title={title} /> })),

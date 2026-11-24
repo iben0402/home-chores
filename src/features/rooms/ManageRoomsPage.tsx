@@ -12,6 +12,9 @@ import { FormError } from '../auth/parts'
 import { useHousehold } from '../shell/useHousehold'
 import { useIsAdmin } from '../shell/useIsAdmin'
 import { AddRoomSheet, RenameRoomSheet } from './RoomSheets'
+import { todayISO } from '../../lib/schedule'
+import { roomCounts } from '../chores/choreList'
+import { useOpenOccurrences } from '../chores/useHouseholdData'
 import { useRooms } from './useRooms'
 
 type Open = { kind: 'add' } | { kind: 'rename'; room: Room } | { kind: 'delete'; room: Room } | null
@@ -21,6 +24,9 @@ export function ManageRoomsPage() {
   const household = useHousehold()
   const isAdmin = useIsAdmin()
   const rooms = useRooms(household.id)
+  const counts = roomCounts(useOpenOccurrences(household.id) ?? [], todayISO())
+  const choresIn = (id: string) => counts[id]?.open ?? 0
+  const choreCount = (n: number) => (n === 0 ? 'No chores' : n === 1 ? '1 chore' : `${n} chores`)
   const [open, setOpen] = useState<Open>(null)
   const [order, setOrder] = useState<string[] | null>(null) // local order while dragging/saving
   const [announcement, setAnnouncement] = useState('')
@@ -169,7 +175,7 @@ export function ManageRoomsPage() {
                 <Icon name="grip-vertical" />
               </button>
               <RoomIconTile room={room} />
-              <RoomText name={room.name} caption="No chores" />
+              <RoomText name={room.name} caption={choreCount(choresIn(room.id))} />
               <IconButton icon="pencil" label={`Rename ${room.name}`} onClick={() => setOpen({ kind: 'rename', room })} />
               <IconButton icon="trash-2" tone="danger" label={`Delete ${room.name}`} onClick={() => setOpen({ kind: 'delete', room })} />
             </li>
@@ -193,7 +199,7 @@ export function ManageRoomsPage() {
       {open?.kind === 'delete' && (
         <ConfirmDialog
           title={`Delete ${open.room.name}?`}
-          body="It has no chores."
+          body={deleteMessage(choresIn(open.room.id))}
           confirmLabel="Delete room"
           loading={deleting}
           onCancel={() => setOpen(null)}
@@ -213,6 +219,11 @@ export function ManageRoomsPage() {
       )}
     </>
   )
+}
+
+function deleteMessage(n: number): string {
+  if (n === 0) return 'It has no chores.'
+  return n === 1 ? 'Its 1 chore moves to General. Its history stays.' : `Its ${n} chores move to General. Their history stays.`
 }
 
 function RoomIconTile({ room }: { room: Room }) {
