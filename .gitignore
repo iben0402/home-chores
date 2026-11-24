@@ -23,8 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
-# Local env & Firebase
-.env.local
+# Env files (config comes from .env.local locally and GitHub secrets in CI)
+.env*
+!.env.example
 .firebase/
 *-debug.log
 .superpowers/
