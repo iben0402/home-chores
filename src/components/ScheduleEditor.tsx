@@ -6,7 +6,7 @@ import { SegmentedControl } from './SegmentedControl'
 import { SelectField } from './SelectField'
 
 /** How often a chore comes round, in words a non-technical flatmate would use. */
-export function ScheduleEditor({ value, onChange, today }: { value: ScheduleForm; onChange: (v: ScheduleForm) => void; today: string }) {
+export function ScheduleEditor({ value, onChange, today, allowOnce = true }: { value: ScheduleForm; onChange: (v: ScheduleForm) => void; today: string; allowOnce?: boolean }) {
   const set = (patch: Partial<ScheduleForm>) => onChange({ ...value, ...patch })
   const next = previewDates(value, today)
   const unitLabel = (u: string) => (value.every === 1 ? u.replace(/s$/, '') : u)
@@ -19,7 +19,7 @@ export function ScheduleEditor({ value, onChange, today }: { value: ScheduleForm
         value={value.mode}
         onChange={(mode) => set({ mode })}
         options={[
-          { value: 'once', label: 'Once' },
+          ...(allowOnce ? [{ value: 'once' as const, label: 'Once' }] : []),
           { value: 'after', label: 'After it’s done' },
           { value: 'calendar', label: 'On set days' },
         ]}

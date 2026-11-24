@@ -4,7 +4,7 @@ import { Fab } from '../../components/Fab'
 import type { ChoreFilter } from '../../components/FilterChips'
 import { SectionHeader } from '../../components/SectionHeader'
 import { Snackbar } from '../../components/Snackbar'
-import { completeOccurrence, takeOccurrence, undoCompletion, type Occurrence, type UndoToken } from '../../data/chores'
+import { assignOccurrence, completeOccurrence, takeOccurrence, undoCompletion, type Occurrence, type UndoToken } from '../../data/chores'
 import type { Member } from '../../data/households'
 import type { Room } from '../../data/rooms'
 import { dueLabel, todayISO } from '../../lib/schedule'
@@ -12,6 +12,12 @@ import { db } from '../../lib/firebase'
 import { firstName } from '../../lib/names'
 import { useAuth } from '../auth/useAuth'
 import { buildChoreList } from './choreList'
+import { AssignSheet } from './AssignSheet'
+import { BottomSheet } from '../../components/BottomSheet'
+import { SheetAction } from '../../components/SheetAction'
+import { Icon } from '../../components/Icon'
+import { Link } from 'react-router'
+import { useIsAdmin } from '../shell/useIsAdmin'
 
 type Snack = { message: string; undo?: UndoToken } | null
 
@@ -31,7 +37,9 @@ export function ChoreListView({ hid, occurrences, filter, roomId, rooms, members
   fab?: { to: string; label?: string }
 }) {
   const { user } = useAuth()
+  const isAdmin = useIsAdmin()
   const today = todayISO()
+  const [sheet, setSheet] = useState<{ kind: 'actions' | 'assign'; occurrence: Occurrence } | null>(null)
   const [ghosts, setGhosts] = useState<Map<string, Occurrence>>(new Map())
   const [snack, setSnack] = useState<Snack>(null)
   const timers = useRef<number[]>([])
@@ -78,6 +86,18 @@ export function ChoreListView({ hid, occurrences, filter, roomId, rooms, members
     }
   }
 
+  async function assign(o: Occurrence, uid: string | null) {
+    setSheet(null)
+    if (uid === o.assigneeUid) return
+    try {
+      await assignOccurrence(db, hid, o.id, uid, me.uid)
+      const name = uid === me.uid ? 'you' : uid ? firstName(members.get(uid)?.displayName) : null
+      showSnack({ message: name ? `Assigned to ${name}` : 'Unassigned' })
+    } catch {
+      showSnack({ message: 'Couldn’t change who it’s for. Try again.' })
+    }
+  }
+
   // Ghosts keep a just-ticked row on screen while it animates out.
   const merged = [...occurrences.filter((o) => !ghosts.has(o.id)), ...ghosts.values()]
   const { sections } = buildChoreList(merged, { uid: me.uid, filter, today, roomId })
@@ -108,14 +128,63 @@ export function ChoreListView({ hid, occurrences, filter, roomId, rooms, members
                   }}
                   onToggle={(checked) => checked && !done && void tick(o)}
                   onTake={() => void take(o)}
+                  onOpen={done ? undefined : () => setSheet({ kind: 'actions', occurrence: o })}
+                  onAssignee={done ? undefined : () => setSheet({ kind: 'assign', occurrence: o })}
                 />
               )
             })}
           </div>
         </section>
       ))}
+      {sheet?.kind === 'actions' && (
+        <RowSheet
+          occurrence={sheet.occurrence}
+          subtitle={[
+            rooms.get(sheet.occurrence.roomId)?.name,
+            dueLabel(sheet.occurrence.dueDate, today),
+            sheet.occurrence.assigneeUid === me.uid ? 'you' : sheet.occurrence.assigneeUid ? firstName(members.get(sheet.occurrence.assigneeUid)?.displayName) : 'nobody yet',
+          ].filter(Boolean).join(' · ')}
+          me={me.uid}
+          hid={hid}
+          onTake={() => {
+            setSheet(null)
+            void take(sheet.occurrence)
+          }}
+          onUnassign={() => void assign(sheet.occurrence, null)}
+          onAssignTo={() => setSheet({ kind: 'assign', occurrence: sheet.occurrence })}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet?.kind === 'assign' && (
+        <AssignSheet occurrence={sheet.occurrence} members={members} me={me.uid} isAdmin={isAdmin} onAssign={(uid) => void assign(sheet.occurrence, uid)} onClose={() => setSheet(null)} />
+      )}
       {fab && <Fab to={fab.to} label={fab.label} lifted={!!snack} />}
       {snack && <Snackbar message={snack.message} onAction={snack.undo ? () => void undo(snack.undo!) : undefined} />}
     </>
+  )
+}
+
+/** Row actions: Take it / Unassign me, Assign to…, Open chore. */
+function RowSheet({ occurrence, subtitle, me, hid, onTake, onUnassign, onAssignTo, onClose }: {
+  occurrence: Occurrence
+  subtitle: string
+  me: string
+  hid: string
+  onTake: () => void
+  onUnassign: () => void
+  onAssignTo: () => void
+  onClose: () => void
+}) {
+  return (
+    <BottomSheet title={occurrence.choreTitle} subtitle={subtitle} onClose={onClose}>
+      {occurrence.assigneeUid === null && <SheetAction icon="hand" label="Take it" onClick={onTake} />}
+      {occurrence.assigneeUid === me && <SheetAction icon="user-round-minus" label="Unassign me" onClick={onUnassign} />}
+      <SheetAction icon="user-round-plus" label="Assign to…" onClick={onAssignTo} />
+      <div role="separator" className="mx-5 my-1 h-px bg-border" />
+      <Link to={`/h/${hid}/chores/${occurrence.choreId}`} className="flex min-h-14 w-full items-center gap-4 px-5 text-body-medium text-fg no-underline hover:bg-surface-hover">
+        <Icon name="arrow-up-right" size={22} className="text-fg-muted" />
+        Open chore
+      </Link>
+    </BottomSheet>
   )
 }

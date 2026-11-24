@@ -63,6 +63,14 @@ vi.mock('../data/chores', async (importOriginal) => {
       return () => {}
     }),
     createChore: vi.fn(),
+    assignOccurrence: vi.fn(),
+    updateChore: vi.fn(),
+    deleteChore: vi.fn(),
+    archiveChore: vi.fn(),
+    watchChore: vi.fn((_db, _hid, _id, cb) => {
+      cb(null)
+      return () => {}
+    }),
     completeOccurrence: vi.fn(),
     undoCompletion: vi.fn(),
     takeOccurrence: vi.fn(),

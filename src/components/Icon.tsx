@@ -1,4 +1,6 @@
 import {
+  Inbox,
+  UserRoundMinus,
   ArrowUpRight,
   CircleCheck,
   CircleDot,
@@ -52,6 +54,8 @@ import {
 
 // Lucide icons in use, by the names the design system uses. Add here as screens need more.
 const icons = {
+  'inbox': Inbox,
+  'user-round-minus': UserRoundMinus,
   'arrow-up-right': ArrowUpRight,
   'circle-check': CircleCheck,
   'circle-dot': CircleDot,

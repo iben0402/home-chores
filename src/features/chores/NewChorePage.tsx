@@ -14,6 +14,7 @@ import { db } from '../../lib/firebase'
 import { FormError } from '../auth/parts'
 import { useAuth } from '../auth/useAuth'
 import { useRooms } from '../rooms/useRooms'
+import { useMembers } from './useHouseholdData'
 import { useHousehold } from '../shell/useHousehold'
 import { useIsAdmin } from '../shell/useIsAdmin'
 
@@ -28,6 +29,8 @@ export function NewChorePage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const rooms = useRooms(household.id)
+  const members = useMembers(household.id)
+  const [assignee, setAssignee] = useState('')
   const today = todayISO()
 
   const [title, setTitle] = useState('')
@@ -63,6 +66,7 @@ export function NewChorePage() {
         roomId: room,
         rule: once ? { kind: 'oneoff' } : ruleFromForm(schedule),
         startISO: once ? due : today,
+        assigneeUid: assignee || null,
       })
       navigate(`/h/${household.id}`, { replace: true })
     } catch {
@@ -106,6 +110,16 @@ export function NewChorePage() {
             <FieldMessage id="due-msg" error={errors.due} />
           </div>
         )}
+        <SelectField
+          label={isAdmin && !once ? 'Who does the first one?' : 'For'}
+          hint={isAdmin && !once ? 'You can assign each time separately on the chore’s page.' : undefined}
+          value={assignee}
+          onChange={setAssignee}
+          options={[
+            { value: '', label: 'Nobody yet — anyone can take it' },
+            ...[...members.values()].map((m) => ({ value: m.uid, label: m.uid === user.uid ? 'Me' : m.displayName })),
+          ]}
+        />
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="note">
             Note <span className="font-normal text-fg-muted">(optional)</span>
