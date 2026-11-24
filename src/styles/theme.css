@@ -1,0 +1,251 @@
+/* Copied from the Claude Design system "Home Chores" (design_system/tailwind/theme.css, local reference only).
+   To update: re-export from Claude Design and copy the file over this one. */
+/* Home Chores — Tailwind CSS v4 theme. Generated from tokens.json; edit tokens, not this file. */
+@import "tailwindcss";
+
+/* Theme is chosen by data-theme on <html> (see the boot script in the README). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  /* Only semantic colours exist: no raw palette utilities like bg-red-500. */
+  --color-*: initial;
+  --color-canvas: #f6f3ee;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #efebe4;
+  --color-surface-raised: #ffffff;
+  --color-surface-hover: #f1ede6;
+  --color-surface-inverse: #2a2520;
+  --color-border: #e4ded4;
+  --color-border-strong: #8a8176;
+  --color-scrim: rgba(28, 24, 20, 0.44);
+  --color-fg: #2a2520;
+  --color-fg-muted: #655d54;
+  --color-fg-inverse: #f6f3ee;
+  --color-inverse-action: #7cc4ba;
+  --color-fg-disabled: #a39a8f;
+  --color-primary: #2a6a64;
+  --color-primary-hover: #225a55;
+  --color-primary-pressed: #1b4a46;
+  --color-on-primary: #ffffff;
+  --color-primary-soft: #e0efec;
+  --color-focus-ring: #1f5f99;
+  --color-success: #2d7046;
+  --color-on-success: #ffffff;
+  --color-success-soft: #e2f1e6;
+  --color-warning: #8a4d00;
+  --color-warning-soft: #fcefd8;
+  --color-danger: #b3261e;
+  --color-on-danger: #ffffff;
+  --color-danger-hover: #952019;
+  --color-danger-soft: #fbe6e3;
+  --color-info: #2a5d94;
+  --color-info-soft: #e4edf8;
+  --color-status-overdue-fg: #8a4d00;
+  --color-status-overdue-bg: #fcefd8;
+  --color-status-overdue-accent: #d9891c;
+  --color-status-today-fg: #1f5c56;
+  --color-status-today-bg: #dcefeb;
+  --color-status-upcoming-fg: #5c554d;
+  --color-status-upcoming-bg: #efebe4;
+  --color-status-done-fg: #2d7046;
+  --color-status-done-bg: #e2f1e6;
+  --color-status-skipped-fg: #655d54;
+  --color-status-skipped-bg: #f6f3ee;
+  --color-status-unassigned-fg: #4b5a78;
+  --color-status-unassigned-bg: #e9edf4;
+  --color-member-1: #1c6fb0;
+  --color-member-1-ink: #ffffff;
+  --color-member-2: #e0a000;
+  --color-member-2-ink: #1d1a17;
+  --color-member-3: #087a5c;
+  --color-member-3-ink: #ffffff;
+  --color-member-4: #c24f12;
+  --color-member-4-ink: #ffffff;
+  --color-member-5: #c18bd8;
+  --color-member-5-ink: #1d1a17;
+  --color-member-6: #a9daf3;
+  --color-member-6-ink: #1d1a17;
+  --color-member-7: #d97aa6;
+  --color-member-7-ink: #1d1a17;
+  --color-member-8: #3d3a36;
+  --color-member-8-ink: #ffffff;
+  --color-member-9: #a3c65a;
+  --color-member-9-ink: #1d1a17;
+  --color-member-10: #7d5a3c;
+  --color-member-10-ink: #ffffff;
+
+  --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --text-display: 1.75rem;
+  --text-display--line-height: 2.125rem;
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.01em;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.75rem;
+  --text-title--font-weight: 700;
+  --text-title--letter-spacing: -0.005em;
+  --text-heading: 1.125rem;
+  --text-heading--line-height: 1.5rem;
+  --text-heading--font-weight: 600;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5rem;
+  --text-body--font-weight: 400;
+  --text-body-medium: 1rem;
+  --text-body-medium--line-height: 1.375rem;
+  --text-body-medium--font-weight: 500;
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.25rem;
+  --text-label--font-weight: 500;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.125rem;
+  --text-caption--font-weight: 500;
+  --text-overline: 0.75rem;
+  --text-overline--line-height: 1rem;
+  --text-overline--font-weight: 600;
+  --text-overline--letter-spacing: 0.06em;
+  --text-code: 2rem;
+  --text-code--line-height: 2.5rem;
+  --text-code--font-weight: 700;
+  --text-code--letter-spacing: 0.14em;
+
+  --spacing: 0.25rem; /* p-1 = 4px … p-16 = 64px, matching space-* */
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  --radius-full: 9999px;
+
+  --shadow-sm: var(--elevation-sm); /* themed below */
+  --shadow-md: var(--elevation-md); /* themed below */
+  --shadow-lg: var(--elevation-lg); /* themed below */
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-check: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --animate-check-pop: check-pop var(--duration-base) var(--ease-check) both;
+  --animate-check-draw: check-draw var(--duration-base) var(--ease-standard) 60ms both;
+  --animate-sheet-in: sheet-in var(--duration-slow) var(--ease-sheet) both;
+  --animate-snackbar-in: snackbar-in var(--duration-base) var(--ease-decelerate) both;
+
+  @keyframes check-pop { 0% { transform: scale(0.6); opacity: 0.4; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes check-draw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+  @keyframes sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes snackbar-in { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+}
+
+@layer base {
+  :root {
+    --stroke-hairline: 1px;
+    --stroke-strong: 2px;
+    --stroke-focus: 2px;
+    --size-touch: 44px;
+    --size-row: 64px;
+    --size-header: 56px;
+    --size-tabbar: 64px;
+    --size-fab: 56px;
+    --size-avatar-xs: 20px;
+    --size-avatar-sm: 28px;
+    --size-avatar-md: 32px;
+    --size-avatar-lg: 40px;
+    --size-checkbox: 24px;
+    --size-icon: 20px;
+    --size-icon-sm: 16px;
+    --size-content: 520px;
+    --z-base: 0;
+    --z-sticky: 10;
+    --z-header: 20;
+    --z-fab: 30;
+    --z-scrim: 40;
+    --z-sheet: 50;
+    --z-dialog: 60;
+    --z-snackbar: 70;
+    --duration-instant: 80ms;
+    --duration-fast: 140ms;
+    --duration-base: 200ms;
+    --duration-slow: 280ms;
+    --duration-hold: 700ms;
+    --duration-snackbar: 5000ms;
+    --elevation-sm: 0 1px 2px rgba(42, 37, 32, 0.06), 0 1px 1px rgba(42, 37, 32, 0.04);
+    --elevation-md: 0 2px 6px rgba(42, 37, 32, 0.08), 0 8px 20px rgba(42, 37, 32, 0.10);
+    --elevation-lg: 0 -1px 6px rgba(42, 37, 32, 0.05), 0 16px 40px rgba(42, 37, 32, 0.16);
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --color-canvas: #151311;
+    --color-surface: #1e1b18;
+    --color-surface-sunken: #262220;
+    --color-surface-raised: #28241f;
+    --color-surface-hover: #2a2621;
+    --color-surface-inverse: #ece6dd;
+    --color-border: #35302a;
+    --color-border-strong: #7f766b;
+    --color-scrim: rgba(0, 0, 0, 0.6);
+    --color-fg: #f2ede6;
+    --color-fg-muted: #b1a798;
+    --color-fg-inverse: #221e1a;
+    --color-inverse-action: #1f5c56;
+    --color-fg-disabled: #6a6258;
+    --color-primary: #7cc4ba;
+    --color-primary-hover: #95d2c9;
+    --color-primary-pressed: #aedcd5;
+    --color-on-primary: #0e2826;
+    --color-primary-soft: #1d3532;
+    --color-focus-ring: #8cc0f2;
+    --color-success: #7fcb98;
+    --color-on-success: #0d2616;
+    --color-success-soft: #1a3122;
+    --color-warning: #f0b45c;
+    --color-warning-soft: #3a2a12;
+    --color-danger: #f2948c;
+    --color-on-danger: #300c09;
+    --color-danger-hover: #f7aea7;
+    --color-danger-soft: #3b1916;
+    --color-info: #93bdec;
+    --color-info-soft: #18283b;
+    --color-status-overdue-fg: #f0b45c;
+    --color-status-overdue-bg: #3a2a12;
+    --color-status-overdue-accent: #c98a30;
+    --color-status-today-fg: #8fd0c6;
+    --color-status-today-bg: #173430;
+    --color-status-upcoming-fg: #bdb3a5;
+    --color-status-upcoming-bg: #2a2621;
+    --color-status-done-fg: #7fcb98;
+    --color-status-done-bg: #1a3122;
+    --color-status-skipped-fg: #b1a798;
+    --color-status-skipped-bg: #1e1b18;
+    --color-status-unassigned-fg: #aebbd6;
+    --color-status-unassigned-bg: #232a38;
+    --color-member-1: #5aa9e6;
+    --color-member-1-ink: #1d1a17;
+    --color-member-2: #e8b230;
+    --color-member-2-ink: #1d1a17;
+    --color-member-3: #3fbf96;
+    --color-member-3-ink: #1d1a17;
+    --color-member-4: #ef8a4e;
+    --color-member-4-ink: #1d1a17;
+    --color-member-5: #8e4fab;
+    --color-member-5-ink: #ffffff;
+    --color-member-6: #8fcbef;
+    --color-member-6-ink: #1d1a17;
+    --color-member-7: #e7a2c2;
+    --color-member-7-ink: #1d1a17;
+    --color-member-8: #d8d0c4;
+    --color-member-8-ink: #1d1a17;
+    --color-member-9: #b5d473;
+    --color-member-9-ink: #1d1a17;
+    --color-member-10: #c9a27a;
+    --color-member-10-ink: #1d1a17;
+    --elevation-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --elevation-md: 0 2px 6px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.45);
+    --elevation-lg: 0 -1px 6px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.6);
+  }
+  html { background: var(--color-canvas); color: var(--color-fg); font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: var(--stroke-focus) solid var(--color-focus-ring); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 120ms !important; }
+  }
+}
