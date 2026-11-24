@@ -23,7 +23,7 @@ beforeAll(async () => {
 beforeEach(() => testEnv.clearFirestore())
 afterAll(() => testEnv.cleanup())
 
-describe('baseline deny-all rules', () => {
+describe('baseline: anything not explicitly allowed is denied', () => {
   test('unauthenticated read of households/h1 is denied', async () => {
     const db = testEnv.unauthenticatedContext().firestore()
     await assertFails(getDoc(doc(db, 'households/h1')))
@@ -34,9 +34,9 @@ describe('baseline deny-all rules', () => {
     await assertFails(setDoc(doc(db, 'households/h1'), { name: 'x' }))
   })
 
-  test('signed-in user (uid alice) read of households/h1 is denied', async () => {
+  test('signed-in user read of an unknown collection is denied', async () => {
     const db = testEnv.authenticatedContext('alice').firestore()
-    await assertFails(getDoc(doc(db, 'households/h1')))
+    await assertFails(getDoc(doc(db, 'secrets/s1')))
   })
 
   test('signed-in user write of users/alice is denied', async () => {

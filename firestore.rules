@@ -1,11 +1,88 @@
 rules_version = '2';
 
-// Baseline: deny everything. Real rules arrive with each feature plan
-// (see docs/superpowers/specs/2026-11-24-home-chores-design.md §10).
+// Chours security rules. All authorisation lives here (there is no server).
+// Design: docs/superpowers/specs/2026-11-24-home-chores-design.md §10.
+// Anything not matched below is denied.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function household(hid) { return /databases/$(database)/documents/households/$(hid); }
+    function isMember(hid) { return exists(/databases/$(database)/documents/households/$(hid)/members/$(me())); }
+    function isAdmin(hid) { return me() in get(household(hid)).data.adminUids; }
+    // As it will be after this write/batch (lets a new household's rooms and invite go in the same batch).
+    function isAdminAfter(hid) { return me() in getAfter(household(hid)).data.adminUids; }
+    function creatingHousehold(hid) {
+      return !exists(household(hid)) && getAfter(household(hid)).data.createdBy == me();
+    }
+    function validName(name) { return name is string && name.size() > 0 && name.size() <= 80; }
+    function onlyChanged(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function activeInviteFor(code, hid) {
+      let invite = get(/databases/$(database)/documents/invites/$(code)).data;
+      return invite.householdId == hid && invite.active == true;
+    }
+
+    match /households/{hid} {
+      // Any signed-in user may read a household by ID: the join preview (spec §8.7). IDs are
+      // random and only reachable through invite codes. No listing.
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name', 'adminUids', 'inviteCode', 'createdBy', 'createdAt'])
+        && request.resource.data.createdBy == me()
+        && request.resource.data.adminUids == [me()]
+        && validName(request.resource.data.name);
+      allow update: if signedIn() && isAdmin(hid)
+        && onlyChanged(['name', 'adminUids', 'inviteCode'])
+        && request.resource.data.adminUids is list
+        && request.resource.data.adminUids.size() > 0
+        && validName(request.resource.data.name);
+
+      match /members/{memberId} {
+        // Join preview: signed-in users may see who is in a household (names, colours; no emails).
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && memberId == me()
+          && request.resource.data.keys().hasOnly(['uid', 'displayName', 'color', 'joinedAt', 'inviteCode'])
+          && request.resource.data.uid == me()
+          && validName(request.resource.data.displayName)
+          && request.resource.data.color is int
+          && request.resource.data.color >= 1 && request.resource.data.color <= 10
+          && (creatingHousehold(hid)
+              || (request.resource.data.inviteCode is string && activeInviteFor(request.resource.data.inviteCode, hid)));
+        allow update: if signedIn() && memberId == me()
+          && onlyChanged(['displayName'])
+          && validName(request.resource.data.displayName);
+        // Leave (self) or remove (admin).
+        allow delete: if signedIn() && (memberId == me() || isAdmin(hid));
+      }
+
+      match /rooms/{roomId} {
+        allow read: if signedIn() && isMember(hid);
+        allow create: if signedIn() && isAdminAfter(hid)
+          && validName(request.resource.data.name);
+        allow update: if signedIn() && isAdmin(hid) && validName(request.resource.data.name);
+        allow delete: if signedIn() && isAdmin(hid) && resource.data.get('isDefault', false) != true;
+      }
+    }
+
+    // "My households": a collection-group query for my own member docs.
+    match /{path=**}/members/{memberId} {
+      allow read: if signedIn() && resource.data.uid == me();
+    }
+
+    match /invites/{code} {
+      // Look up a code you were given; never list them.
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['householdId', 'householdName', 'active', 'createdBy', 'createdAt'])
+        && request.resource.data.active == true
+        && request.resource.data.createdBy == me()
+        && isAdminAfter(request.resource.data.householdId)
+        && getAfter(household(request.resource.data.householdId)).data.inviteCode == code;
+      // Replacing a code marks the old one inactive (so joiners hear "replaced"); renaming updates its copy of the name.
+      allow update: if signedIn() && isAdmin(resource.data.householdId)
+        && onlyChanged(['active', 'householdName']);
     }
   }
 }
