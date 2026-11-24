@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, setDoc, updateDoc, writeBatch, type Firestore, type Unsubscribe } from 'firebase/firestore'
+import { collection, doc, getDocs, onSnapshot, orderBy, query, setDoc, updateDoc, where, writeBatch, type Firestore, type Unsubscribe } from 'firebase/firestore'
 
 // Room data access. Takes the Firestore instance first (see households.ts).
 
@@ -48,9 +48,19 @@ export async function reorderRooms(db: Firestore, hid: string, orderedIds: strin
 }
 
 /**
- * Admin: delete a room (never General). Chores don't exist yet; when they do, this batch also
- * moves the room's chores and open occurrences to General (spec §8.8).
+ * Admin: delete a room (never General). In the same batch its chores and their open occurrences
+ * move to General (spec §8.8); done occurrences keep their old room for history.
  */
 export async function deleteRoom(db: Firestore, hid: string, roomId: string): Promise<void> {
-  await deleteDoc(doc(roomsOf(db, hid), roomId))
+  const general = (await getDocs(query(roomsOf(db, hid), where('isDefault', '==', true)))).docs[0]
+  if (!general) throw new Error('This household has no General room.')
+  const [chores, open] = await Promise.all([
+    getDocs(query(collection(db, 'households', hid, 'chores'), where('roomId', '==', roomId))),
+    getDocs(query(collection(db, 'households', hid, 'occurrences'), where('roomId', '==', roomId), where('status', '==', 'open'))),
+  ])
+  const batch = writeBatch(db)
+  chores.docs.forEach((c) => batch.update(c.ref, { roomId: general.id }))
+  open.docs.forEach((o) => batch.update(o.ref, { roomId: general.id }))
+  batch.delete(doc(roomsOf(db, hid), roomId))
+  await batch.commit()
 }
