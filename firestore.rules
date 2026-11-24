@@ -129,9 +129,11 @@ service cloud.firestore {
         function chore() { return get(chorePath(resource.data.choreId)).data; }
         function newOccurrenceFields() {
           let o = request.resource.data;
-          return o.keys().hasOnly(['choreId', 'choreTitle', 'roomId', 'kind', 'seq', 'dueDate', 'status', 'assigneeUid', 'createdBy', 'createdByName'])
-            && o.status == 'open' && o.assigneeUid == null && o.createdBy == me()
-            && o.seq is int && validISO(o.dueDate);
+          return o.keys().hasOnly(['choreId', 'choreTitle', 'roomId', 'kind', 'seq', 'dueDate', 'status', 'assigneeUid', 'assignedBy', 'createdBy', 'createdByName'])
+            && o.status == 'open' && o.createdBy == me()
+            && o.seq is int && validISO(o.dueDate)
+            // Unassigned, or (a new chore's first one) assigned by me to a member.
+            && (o.assigneeUid == null || (o.assignedBy == me() && o.assigneeUid is string && exists(memberDoc(hid, o.assigneeUid))));
         }
         allow read: if signedIn() && isMember(hid);
         allow create: if signedIn() && isMember(hid) && newOccurrenceFields() && (
@@ -140,8 +142,9 @@ service cloud.firestore {
           || (!exists(chorePath(request.resource.data.choreId))
               && getAfter(chorePath(request.resource.data.choreId)).data.createdBy == me()
               && request.resource.data.seq < getAfter(chorePath(request.resource.data.choreId)).data.nextSeq)
-          // Topping up a repeating chore when completing: exactly the next seq, counter moves on.
-          || (get(chorePath(request.resource.data.choreId)).data.kind != 'oneoff'
+          // Topping up a repeating chore when completing: exactly the next seq, counter moves on, unassigned.
+          || (request.resource.data.assigneeUid == null
+              && get(chorePath(request.resource.data.choreId)).data.kind != 'oneoff'
               && request.resource.data.seq == get(chorePath(request.resource.data.choreId)).data.nextSeq
               && getAfter(chorePath(request.resource.data.choreId)).data.nextSeq == request.resource.data.seq + 1
               && request.resource.data.roomId == get(chorePath(request.resource.data.choreId)).data.roomId
@@ -155,10 +158,21 @@ service cloud.firestore {
               && request.resource.data.doneBy == me() && request.resource.data.doneAt == request.time)
           // Re-date an open occurrence (completing an "after it's done" chore moves the queue).
           || (resource.data.status == 'open' && onlyChanged(['dueDate']) && validISO(request.resource.data.dueDate))
-          // Take it: an unassigned open occurrence, for yourself.
-          || (resource.data.status == 'open' && resource.data.assigneeUid == null
+          // Assign (spec §8.4): anyone may give an open occurrence to any member, signed as themselves.
+          || (resource.data.status == 'open'
               && onlyChanged(['assigneeUid', 'assignedBy'])
-              && request.resource.data.assigneeUid == me() && request.resource.data.assignedBy == me())
+              && request.resource.data.assignedBy == me()
+              && request.resource.data.assigneeUid is string
+              && exists(memberDoc(hid, request.resource.data.assigneeUid)))
+          // Unassign yourself (only admins may unassign someone else).
+          || (resource.data.status == 'open' && resource.data.assigneeUid == me()
+              && onlyChanged(['assigneeUid', 'assignedBy'])
+              && request.resource.data.assigneeUid == null && request.resource.data.assignedBy == me())
+          // The creator of a one-off edits its open occurrence: words, room, date.
+          || (resource.data.status == 'open' && chore().kind == 'oneoff' && chore().createdBy == me()
+              && onlyChanged(['choreTitle', 'roomId', 'dueDate'])
+              && validName(request.resource.data.choreTitle) && roomExists(request.resource.data.roomId)
+              && validISO(request.resource.data.dueDate))
           // Undo your own tick within 10 minutes.
           || (resource.data.status == 'done' && resource.data.doneBy == me()
               && request.time < resource.data.doneAt + duration.value(10, 'm')
@@ -168,6 +182,9 @@ service cloud.firestore {
         );
         allow delete: if signedIn() && isMember(hid) && (
           isAdmin(hid)
+          // The creator of a one-off deletes it (with the chore).
+          || (resource.data.status == 'open' && chore().kind == 'oneoff' && chore().createdBy == me()
+              && !existsAfter(chorePath(resource.data.choreId)))
           // Undo removes the top-up it made: the newest, still open and unassigned, counter moves back.
           || (resource.data.status == 'open' && resource.data.assigneeUid == null
               && resource.data.seq == chore().nextSeq - 1
