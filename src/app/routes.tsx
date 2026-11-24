@@ -8,6 +8,7 @@ import { GetStartedPage } from '../features/households/GetStartedPage'
 import { JoinCodePage } from '../features/households/JoinCodePage'
 import { JoinPage } from '../features/households/JoinPage'
 import { HouseholdLayout } from '../features/shell/HouseholdLayout'
+import { HouseholdTabPlaceholder } from '../features/shell/HouseholdTabPlaceholder'
 import { TodayPage } from '../features/shell/TodayPage'
 import { RedirectIfAuthed, RequireAuth } from './guards'
 import { HomeRedirect } from './HomeRedirect'
@@ -20,7 +21,6 @@ const householdScreens: Array<[path: string, title: string]> = [
   ['chores/new', 'New chore'],
   ['chores/:choreId', 'Chore'],
   ['history', 'History'],
-  ['household', 'Household'],
 ]
 
 export const routes: RouteObject[] = [
@@ -50,6 +50,7 @@ export const routes: RouteObject[] = [
             element: <HouseholdLayout />,
             children: [
               { index: true, element: <TodayPage /> },
+              { path: 'household', element: <HouseholdTabPlaceholder /> },
               ...householdScreens.map(([path, title]) => ({ path, element: <Placeholder title={title} /> })),
             ],
           },

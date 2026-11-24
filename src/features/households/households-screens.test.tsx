@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { updateDisplayName } from '../../data/auth'
+import { signOut, updateDisplayName } from '../../data/auth'
 import {
   createHousehold,
   findInvite,
@@ -173,6 +173,16 @@ describe('Invite link /join/:code', () => {
     renderApp('/join/K7QM4XRT', ANNA)
     expect(await screen.findByText('That code has been replaced with a new one. Ask for the latest code.')).toBeInTheDocument()
     expect(screen.getByLabelText('Invite code')).toHaveValue('K7QM-4XRT')
+  })
+})
+
+describe('Household tab (until the account screen exists)', () => {
+  test('has Log out', async () => {
+    const user = userEvent.setup()
+    vi.mocked(signOut).mockResolvedValue()
+    renderApp('/h/h1/household', ANNA)
+    await user.click(screen.getByRole('button', { name: 'Log out' }))
+    expect(signOut).toHaveBeenCalled()
   })
 })
 
