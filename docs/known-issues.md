@@ -41,7 +41,7 @@ Ordered by priority. "Confirmed" means it was reproduced against the Firestore e
 - **"Mine" on Today** currently shows everything assigned to you, including later occurrences. Spec §8.9 could also be read as "the next of each chore, plus later ones assigned to you".
 
 ## Elsewhere (from earlier reviews)
-- Auth: the button press-scale animation is instant (transition property); the password toggle's screen-reader label; the offline notice is inserted with its text already in it (may not be announced); the theme doesn't follow an OS change while the app is open; the "Log in instead" link depends on matching the error text; the placeholder page's sign-out error is unhandled.
+- Auth: the button press-scale animation is instant (transition property); the password toggle's screen-reader label; the offline notice is inserted with its text already in it (may not be announced); the "Log in instead" link depends on matching the error text; the placeholder page's sign-out error is unhandled.
 - Households: the "Copied" label never resets; creating a household offline spins forever; an existing member opening a replaced code sees the error instead of going in.
 - Tooling: `/build-check` flags `firestore.rules`, `src/index.css` and `src/test/setup.ts` as having no mapped test (they are covered by the emulator and unit suites).
 - Lint: a fast-refresh warning in `src/components/Avatar.tsx`.

@@ -150,6 +150,25 @@ describe('New chore', () => {
   })
 })
 
+test('admin: “after it’s done” chores can start on a chosen date', async () => {
+  const user = userEvent.setup()
+  vi.mocked(createChore).mockResolvedValue('c3')
+  renderApp('/h/h1/chores/new', ANNA)
+  await user.type(screen.getByLabelText('What needs doing?'), 'Vacuuming')
+  await user.click(screen.getByRole('radio', { name: 'After it’s done' }))
+  const first = screen.getByLabelText('First due')
+  expect(first).toHaveValue(today)
+  expect(first).toHaveAccessibleDescription('The next ones follow from this date, and move when it’s done late or early.')
+  await user.clear(first)
+  await user.type(first, addDays(today, 3))
+  await user.click(screen.getByRole('button', { name: 'Add repeating chore' }))
+  expect(createChore).toHaveBeenCalledWith(expect.anything(), 'h1', expect.anything(), expect.objectContaining({
+    title: 'Vacuuming',
+    rule: { kind: 'interval', every: 1, unit: 'week' },
+    startISO: addDays(today, 3),
+  }))
+})
+
 describe('Rooms with chores', () => {
   test('cards count open and overdue chores; the room lists its chores', async () => {
     const user = userEvent.setup()

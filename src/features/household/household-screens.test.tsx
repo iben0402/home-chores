@@ -135,6 +135,17 @@ describe('Your account', () => {
   })
 })
 
+test('Your account: appearance (system / light / dark)', async () => {
+  const user = userEvent.setup()
+  localStorage.clear()
+  renderApp('/account', ANNA)
+  const group = screen.getByRole('radiogroup', { name: 'Appearance' })
+  expect(within(group).getByRole('radio', { name: 'System' })).toBeChecked()
+  await user.click(within(group).getByRole('radio', { name: 'Dark' }))
+  expect(document.documentElement.dataset.theme).toBe('dark')
+  expect(localStorage.getItem('theme')).toBe('dark')
+})
+
 describe('switcher', () => {
   test('lists your households with your role and switches', async () => {
     const user = userEvent.setup()
