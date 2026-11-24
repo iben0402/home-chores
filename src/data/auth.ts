@@ -1,22 +1,38 @@
 import {
   createUserWithEmailAndPassword,
+  onAuthStateChanged,
   GoogleAuthProvider,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
   updateProfile,
+  type User,
 } from 'firebase/auth'
 import { auth } from '../lib/firebase'
 
 // Every Firebase Auth call the app makes lives here. Screens call these, never firebase/auth.
 
+export type AppUser = { uid: string; email: string | null; displayName: string | null }
+
+function toAppUser(user: User | null): AppUser | null {
+  return user ? { uid: user.uid, email: user.email, displayName: user.displayName } : null
+}
+
 const profileListeners = new Set<() => void>()
 
-/** Notified when the signed-in user's profile changes (e.g. the name set right after sign-up). */
-export function onProfileChange(listener: () => void): () => void {
-  profileListeners.add(listener)
-  return () => profileListeners.delete(listener)
+/**
+ * The signed-in user, live: sign-in/out from Firebase plus profile changes Firebase doesn't
+ * report itself (the name saved right after sign-up). Returns an unsubscribe function.
+ */
+export function watchAuth(onChange: (user: AppUser | null) => void): () => void {
+  const emitCurrent = () => onChange(toAppUser(auth.currentUser))
+  const stopAuth = onAuthStateChanged(auth, (user) => onChange(toAppUser(user)))
+  profileListeners.add(emitCurrent)
+  return () => {
+    stopAuth()
+    profileListeners.delete(emitCurrent)
+  }
 }
 
 export async function signIn(email: string, password: string): Promise<void> {
@@ -25,9 +41,12 @@ export async function signIn(email: string, password: string): Promise<void> {
 
 export async function signUp(input: { name: string; email: string; password: string }): Promise<void> {
   const { user } = await createUserWithEmailAndPassword(auth, input.email.trim(), input.password)
-  await updateProfile(user, { displayName: input.name.trim() })
-  await user.reload()
-  profileListeners.forEach((listener) => listener())
+  try {
+    await updateProfile(user, { displayName: input.name.trim() })
+    await user.reload()
+  } finally {
+    profileListeners.forEach((listener) => listener())
+  }
 }
 
 /** Popup, not redirect: redirect breaks under browsers' third-party storage blocking. */

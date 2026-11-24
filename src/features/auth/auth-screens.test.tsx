@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { sendReset, signIn, signInWithGoogle, signUp } from '../../data/auth'
 import { ANNA, renderApp } from '../../test/renderApp'
@@ -103,6 +103,29 @@ describe('Create account', () => {
     expect(signUp).toHaveBeenCalledWith({ name: 'Anna Nowak', email: 'anna@example.com', password: 'kitchen-24' })
     expect(await screen.findByLabelText('Email')).toHaveAccessibleDescription('There’s already an account with this email.')
     expect(screen.getByRole('link', { name: 'Log in instead' })).toHaveAttribute('href', '/login')
+  })
+})
+
+describe('Create account: no early redirect', () => {
+  test('stays on /signup until sign-up finishes, then goes to next', async () => {
+    const user = userEvent.setup()
+    let finish!: () => void
+    vi.mocked(signUp).mockReturnValue(new Promise<void>((resolve) => (finish = resolve)))
+    const { router, setUser } = renderApp('/signup?next=%2Fh%2Fabc')
+    await user.type(screen.getByLabelText('Your name'), 'Anna Nowak')
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com')
+    await user.type(screen.getByLabelText('Password', { selector: 'input' }), 'kitchen-24')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+    // Firebase reports the new user before the name is saved.
+    setUser({ ...ANNA, displayName: null })
+    expect(router.state.location.pathname).toBe('/signup')
+    await act(async () => finish())
+    await waitFor(() => expect(router.state.location.pathname).toBe('/h/abc'))
+  })
+
+  test('a signed-in visitor to /signup is sent on', () => {
+    const { router } = renderApp('/signup', ANNA)
+    expect(router.state.location.pathname).toBe('/')
   })
 })
 

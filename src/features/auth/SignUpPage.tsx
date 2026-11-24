@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
+import { safeNext } from '../../app/safeNext'
 import { Button } from '../../components/Button'
 import { GoogleSignInButton } from '../../components/GoogleSignInButton'
 import { OrDivider } from '../../components/OrDivider'
@@ -8,6 +9,7 @@ import { TextField } from '../../components/TextField'
 import { signInWithGoogle, signUp } from '../../data/auth'
 import { AuthLayout } from './AuthLayout'
 import { BackBar, FooterLink, FormError } from './parts'
+import { useAuth } from './useAuth'
 import { useSubmit } from './useSubmit'
 
 const EMAIL_IN_USE = 'There’s already an account with this email.'
@@ -19,6 +21,7 @@ export function SignUpPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const { busy, errors, setErrors, run } = useSubmit()
+  const { user, loading } = useAuth()
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -31,6 +34,10 @@ export function SignUpPage() {
     if (invalid.name || invalid.email || invalid.password) return setErrors(invalid)
     void run('form', () => signUp({ name, email, password }))
   }
+
+  if (loading) return null
+  // Wait for our own sign-up to finish (name saved) before moving on.
+  if (user && !busy) return <Navigate to={safeNext(params.get('next'))} replace />
 
   return (
     <AuthLayout>
