@@ -94,11 +94,41 @@ service cloud.firestore {
       }
 
       // ---- Chores (spec §8, §10). Members: one-offs only; admins: anything. ----
+      // Occurrence ids are `{choreId}_{seq}`, so a tick or an undo can name exactly what it adds or removes.
       function chorePath(choreId) { return /databases/$(database)/documents/households/$(hid)/chores/$(choreId); }
+      function occPath(occId) { return /databases/$(database)/documents/households/$(hid)/occurrences/$(occId); }
+      function occIdFor(choreId, seq) { return choreId + '_' + string(seq); }
       function roomExists(roomId) { return roomId is string && exists(/databases/$(database)/documents/households/$(hid)/rooms/$(roomId)); }
       function validISO(d) { return d is string && d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
+      // Names shown in History and on chores are your current member name, not anything you type.
+      function myName() { return get(memberDoc(hid, me())).data.displayName; }
 
       match /chores/{choreId} {
+        // The tick being recorded: I complete one of this chore's open occurrences in this same write.
+        function validTick(t) {
+          let before = get(occPath(t.occurrenceId)).data;
+          let after = getAfter(occPath(t.occurrenceId)).data;
+          return t.keys().hasOnly(['occurrenceId', 'by', 'toppedUp', 'previousDates', 'previousLastDoneAt'])
+            && t.by == me() && t.previousDates is list && t.previousDates.size() <= 8
+            && t.previousLastDoneAt == resource.data.get('lastDoneAt', null)
+            && before.choreId == choreId && before.status == 'open'
+            && after.status == 'done' && after.doneBy == me() && after.doneAt == request.time;
+        }
+        // Undoing the chore's last tick, which was mine: that occurrence is reopened in this same write.
+        function undoingMyTick() {
+          let t = resource.data.get('lastTick', null);
+          return t != null && t.by == me()
+            && request.resource.data.lastTick == null
+            && request.resource.data.lastDoneAt == t.previousLastDoneAt
+            && get(occPath(t.occurrenceId)).data.status == 'done'
+            && getAfter(occPath(t.occurrenceId)).data.status == 'open';
+        }
+        function ticking() {
+          return resource.data.kind != 'oneoff' && resource.data.archived == false
+            && request.resource.data.lastDoneAt == request.time
+            && validTick(request.resource.data.lastTick);
+        }
+
         allow read: if signedIn() && isMember(hid);
         allow create: if signedIn() && isMember(hid)
           && request.resource.data.keys().hasOnly(['title', 'description', 'roomId', 'kind', 'interval', 'calendar', 'lookahead', 'nextSeq', 'archived', 'createdBy', 'createdByName', 'createdAt'])
@@ -108,6 +138,7 @@ service cloud.firestore {
           && request.resource.data.kind in ['oneoff', 'interval', 'calendar']
           && request.resource.data.archived == false
           && request.resource.data.createdBy == me()
+          && request.resource.data.createdByName == myName()
           && request.resource.data.createdAt == request.time
           && request.resource.data.nextSeq is int && request.resource.data.lookahead is int
           && request.resource.data.lookahead >= 1 && request.resource.data.lookahead <= 8
@@ -118,9 +149,22 @@ service cloud.firestore {
           || (resource.data.kind == 'oneoff' && resource.data.createdBy == me()
               && onlyChanged(['title', 'description', 'roomId']) && validName(request.resource.data.title)
               && roomExists(request.resource.data.roomId))
-          // Completing (+1) or undoing (-1) moves the queue counter by one.
-          || (onlyChanged(['nextSeq', 'lastDoneAt'])
-              && (request.resource.data.nextSeq == resource.data.nextSeq + 1 || request.resource.data.nextSeq == resource.data.nextSeq - 1))
+          // Tick that tops the queue up: the counter moves on by one, to exactly the occurrence added now.
+          || (ticking() && onlyChanged(['nextSeq', 'lastDoneAt', 'lastTick'])
+              && request.resource.data.nextSeq == resource.data.nextSeq + 1
+              && request.resource.data.lastTick.toppedUp == occIdFor(choreId, resource.data.nextSeq)
+              && !exists(occPath(request.resource.data.lastTick.toppedUp))
+              && existsAfter(occPath(request.resource.data.lastTick.toppedUp)))
+          // Tick with a full queue: nothing added.
+          || (ticking() && onlyChanged(['lastDoneAt', 'lastTick'])
+              && request.resource.data.lastTick.toppedUp == null)
+          // Undo that removes the occurrence the tick added: the counter moves back by one.
+          || (undoingMyTick() && onlyChanged(['nextSeq', 'lastDoneAt', 'lastTick'])
+              && request.resource.data.nextSeq == resource.data.nextSeq - 1
+              && resource.data.lastTick.toppedUp == occIdFor(choreId, request.resource.data.nextSeq)
+              && !existsAfter(occPath(resource.data.lastTick.toppedUp)))
+          // Undo that keeps it (someone took it, or nothing was added).
+          || (undoingMyTick() && onlyChanged(['lastDoneAt', 'lastTick']))
         );
         allow delete: if signedIn() && (isAdmin(hid) || (isMember(hid) && resource.data.kind == 'oneoff' && resource.data.createdBy == me()));
       }
@@ -130,32 +174,41 @@ service cloud.firestore {
         function newOccurrenceFields() {
           let o = request.resource.data;
           return o.keys().hasOnly(['choreId', 'choreTitle', 'roomId', 'kind', 'seq', 'dueDate', 'status', 'assigneeUid', 'assignedBy', 'createdBy', 'createdByName'])
-            && o.status == 'open' && o.createdBy == me()
-            && o.seq is int && validISO(o.dueDate)
+            && o.status == 'open' && o.seq is int && o.seq >= 0 && validISO(o.dueDate)
+            && occId == occIdFor(o.choreId, o.seq)
+            // Signed as me; an admin resizing someone else's chore keeps its creator.
+            && ((o.createdBy == me() && o.createdByName == myName()) || (isAdmin(hid) && o.createdBy is string))
             // Unassigned, or (a new chore's first one) assigned by me to a member.
             && (o.assigneeUid == null || (o.assignedBy == me() && o.assigneeUid is string && exists(memberDoc(hid, o.assigneeUid))));
         }
+        // Matches its chore (as it is after this write).
+        function matchesChore(c) {
+          let o = request.resource.data;
+          return o.kind == c.kind && o.roomId == c.roomId && o.choreTitle == c.title;
+        }
+        function firstOccurrence() {
+          let c = getAfter(chorePath(request.resource.data.choreId)).data;
+          return !exists(chorePath(request.resource.data.choreId))
+            && c.createdBy == me() && request.resource.data.seq < c.nextSeq && matchesChore(c);
+        }
+        function topUp() {
+          let c = get(chorePath(request.resource.data.choreId)).data;
+          return request.resource.data.assigneeUid == null
+            && c.kind != 'oneoff' && c.archived == false && matchesChore(c)
+            && request.resource.data.seq == c.nextSeq
+            && getAfter(chorePath(request.resource.data.choreId)).data.nextSeq == request.resource.data.seq + 1;
+        }
         allow read: if signedIn() && isMember(hid);
         allow create: if signedIn() && isMember(hid) && newOccurrenceFields() && (
-          isAdmin(hid)
-          // First occurrences of a chore I'm creating in this batch.
-          || (!exists(chorePath(request.resource.data.choreId))
-              && getAfter(chorePath(request.resource.data.choreId)).data.createdBy == me()
-              && request.resource.data.seq < getAfter(chorePath(request.resource.data.choreId)).data.nextSeq)
-          // Topping up a repeating chore when completing: exactly the next seq, counter moves on, unassigned.
-          || (request.resource.data.assigneeUid == null
-              && get(chorePath(request.resource.data.choreId)).data.kind != 'oneoff'
-              && request.resource.data.seq == get(chorePath(request.resource.data.choreId)).data.nextSeq
-              && getAfter(chorePath(request.resource.data.choreId)).data.nextSeq == request.resource.data.seq + 1
-              && request.resource.data.roomId == get(chorePath(request.resource.data.choreId)).data.roomId
-              && request.resource.data.choreTitle == get(chorePath(request.resource.data.choreId)).data.title)
+          isAdmin(hid) || firstOccurrence() || topUp()
         );
         allow update: if signedIn() && isMember(hid) && (
           isAdmin(hid)
           // Complete: as yourself, at server time.
           || (resource.data.status == 'open' && request.resource.data.status == 'done'
               && onlyChanged(['status', 'doneBy', 'doneByName', 'doneAt'])
-              && request.resource.data.doneBy == me() && request.resource.data.doneAt == request.time)
+              && request.resource.data.doneBy == me() && request.resource.data.doneAt == request.time
+              && request.resource.data.doneByName == myName())
           // Re-date an open occurrence (completing an "after it's done" chore moves the queue).
           || (resource.data.status == 'open' && onlyChanged(['dueDate']) && validISO(request.resource.data.dueDate))
           // Assign (spec §8.4): anyone may give an open occurrence to any member, signed as themselves.
@@ -185,9 +238,10 @@ service cloud.firestore {
           // The creator of a one-off deletes it (with the chore).
           || (resource.data.status == 'open' && chore().kind == 'oneoff' && chore().createdBy == me()
               && !existsAfter(chorePath(resource.data.choreId)))
-          // Undo removes the top-up it made: the newest, still open and unassigned, counter moves back.
+          // Undoing my last tick removes the occurrence it added, if still open and unassigned.
           || (resource.data.status == 'open' && resource.data.assigneeUid == null
-              && resource.data.seq == chore().nextSeq - 1
+              && chore().get('lastTick', null) != null
+              && chore().lastTick.toppedUp == occId && chore().lastTick.by == me()
               && getAfter(chorePath(resource.data.choreId)).data.nextSeq == resource.data.seq)
         );
       }
