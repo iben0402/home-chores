@@ -1,4 +1,4 @@
-# Home Chores — Design
+# Chours — Design
 
 Date: 2026-11-24
 Status: Draft, awaiting approval (builder pass done)
