@@ -32,7 +32,7 @@ export function ChoreRow({ chore, onToggle, onTake, className }: ChoreRowProps) 
           if (!done) navigator.vibrate?.(10)
           onToggle?.(!done)
         }}
-        className="group relative -m-2.5 -mt-[18px] inline-flex size-(--size-touch) shrink-0 cursor-pointer items-center justify-center rounded-full"
+        className="group relative -m-2.5 -mt-2 inline-flex size-(--size-touch) shrink-0 cursor-pointer items-center justify-center rounded-full"
       >
         <span
           className={cx(

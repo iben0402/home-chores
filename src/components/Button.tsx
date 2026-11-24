@@ -6,11 +6,11 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive' | 'take'
 type Size = 'sm' | 'md' | 'lg'
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-primary text-on-primary enabled:hover:bg-primary-hover enabled:active:bg-primary-pressed',
+  primary: 'border-transparent bg-primary text-on-primary enabled:hover:bg-primary-hover enabled:active:bg-primary-pressed',
   secondary: 'bg-surface text-fg border-border-strong enabled:hover:bg-surface-hover',
-  ghost: 'bg-transparent text-primary enabled:hover:bg-surface-hover',
-  destructive: 'bg-danger text-on-danger enabled:hover:bg-danger-hover',
-  take: 'bg-primary-soft text-primary enabled:hover:bg-primary enabled:hover:text-on-primary',
+  ghost: 'border-transparent bg-transparent text-primary enabled:hover:bg-surface-hover',
+  destructive: 'border-transparent bg-danger text-on-danger enabled:hover:bg-danger-hover',
+  take: 'border-transparent bg-primary-soft text-primary enabled:hover:bg-primary enabled:hover:text-on-primary',
 }
 
 const sizes: Record<Size, string> = {
@@ -46,7 +46,7 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cx(
-        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-transparent leading-5 font-semibold whitespace-nowrap',
+        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border leading-5 font-semibold whitespace-nowrap',
         'transition-[background-color,border-color,transform] duration-(--duration-fast) ease-standard enabled:active:scale-[0.98]',
         'disabled:cursor-not-allowed disabled:border-transparent disabled:bg-surface-sunken disabled:text-fg-disabled aria-busy:cursor-progress',
         variants[variant],
