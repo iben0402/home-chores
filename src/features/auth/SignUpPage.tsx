@@ -20,12 +20,12 @@ export function SignUpPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const { busy, errors, setErrors, run } = useSubmit()
+  const { busy, errors, setErrors, run, formRef } = useSubmit()
   const { user, loading } = useAuth()
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
-    if (busy) return
+    if (busy === 'form') return
     const invalid = {
       name: name.trim() ? undefined : 'Add your name so your household knows who’s who.',
       email: email.trim() ? undefined : 'Enter your email.',
@@ -47,8 +47,8 @@ export function SignUpPage() {
         <p className="m-0 text-body text-fg-muted">You’ll set up or join a household next.</p>
       </div>
       <div className="min-h-4 flex-1" />
-      <form aria-label="Create account" noValidate onSubmit={onSubmit} className="flex shrink-0 flex-col gap-3 px-4 pb-4">
-        <GoogleSignInButton loading={busy === 'google'} onClick={() => void run('google', signInWithGoogle)} />
+      <form aria-label="Create account" ref={formRef} noValidate onSubmit={onSubmit} className="flex shrink-0 flex-col gap-3 px-4 pb-4">
+        <GoogleSignInButton loading={busy === 'google'} disabled={busy === 'form'} onClick={() => void run('google', signInWithGoogle)} />
         <FormError message={errors.form} />
         <OrDivider />
         <TextField

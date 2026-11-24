@@ -1,12 +1,12 @@
 import { Icon } from './Icon'
 
 /** Google's sign-in button: official G mark and Google's neutral light/dark colours (not tokens, by design). */
-export function GoogleSignInButton({ loading, onClick }: { loading?: boolean; onClick: () => void }) {
+export function GoogleSignInButton({ loading, disabled, onClick }: { loading?: boolean; disabled?: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={loading}
+      disabled={loading || disabled}
       aria-busy={loading || undefined}
       style={{ fontFamily: 'Roboto, var(--font-sans)' }}
       className={[
@@ -14,7 +14,7 @@ export function GoogleSignInButton({ loading, onClick }: { loading?: boolean; on
         'border-[#747775] bg-[#FFFFFF] text-[#1F1F1F] dark:border-[#8E918F] dark:bg-[#131314] dark:text-[#E3E3E3]',
         // Google's hover: an 8% overlay of the text colour.
         'before:absolute before:inset-0 before:bg-current before:opacity-0 before:transition-opacity enabled:hover:before:opacity-[0.08]',
-        'aria-busy:cursor-progress',
+        'aria-busy:cursor-progress disabled:cursor-not-allowed disabled:opacity-60 aria-busy:opacity-100',
       ].join(' ')}
     >
       <svg aria-hidden="true" width="20" height="20" viewBox="0 0 48 48" className="shrink-0">

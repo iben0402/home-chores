@@ -17,11 +17,11 @@ export function LoginPage() {
   const query = params.toString() ? `?${params}` : ''
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const { busy, errors, setErrors, run } = useSubmit()
+  const { busy, errors, setErrors, run, formRef } = useSubmit()
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
-    if (busy) return
+    if (busy === 'form') return
     const missing = {
       email: email.trim() ? undefined : 'Enter your email.',
       password: password ? undefined : 'Enter your password.',
@@ -37,8 +37,8 @@ export function LoginPage() {
         <p className="m-0 max-w-80 text-[18px] leading-[26px] text-fg-muted">One shared list for the chores at home.</p>
         <ChorePreview />
       </div>
-      <form aria-label="Log in" noValidate onSubmit={onSubmit} className="flex shrink-0 flex-col gap-3 px-4 pb-4">
-        <GoogleSignInButton loading={busy === 'google'} onClick={() => void run('google', signInWithGoogle)} />
+      <form aria-label="Log in" ref={formRef} noValidate onSubmit={onSubmit} className="flex shrink-0 flex-col gap-3 px-4 pb-4">
+        <GoogleSignInButton loading={busy === 'google'} disabled={busy === 'form'} onClick={() => void run('google', signInWithGoogle)} />
         <FormError message={errors.form} />
         <OrDivider />
         <TextField
