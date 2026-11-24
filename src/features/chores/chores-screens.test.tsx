@@ -83,7 +83,7 @@ describe('Today', () => {
   test('tick off: done by you, with Undo', async () => {
     const user = userEvent.setup()
     withChores()
-    const token = { occurrenceId: 'vac1', choreId: 'vac', previousDates: [], toppedUpId: 't', previousLastDoneAt: null }
+    const token = { occurrenceId: 'vac1', choreId: 'vac' }
     vi.mocked(completeOccurrence).mockResolvedValue(token)
     vi.mocked(undoCompletion).mockResolvedValue()
     renderApp('/h/h1', ANNA)

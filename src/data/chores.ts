@@ -40,18 +40,23 @@ export type Occurrence = {
   createdByName: string
 }
 
-/** What completing changed, so Undo can put it back exactly. */
-export type UndoToken = {
+/** What Undo needs. The details of what the tick changed are kept on the chore (`lastTick`). */
+export type UndoToken = { occurrenceId: string; choreId: string }
+
+/** Recorded on a repeating chore by each tick, so Undo (snackbar or History) can reverse it exactly. */
+type LastTick = {
   occurrenceId: string
-  choreId: string
+  by: string
+  toppedUp: string | null
   previousDates: Array<{ id: string; dueDate: string }>
-  toppedUpId: string | null
   previousLastDoneAt: Timestamp | null
 }
 
 type Person = { uid: string; displayName: string }
 
 const occurrencesOf = (db: Firestore, hid: string) => collection(db, 'households', hid, 'occurrences')
+/** Occurrences have predictable ids, `{choreId}_{seq}`, so rules can tie writes to a chore's queue. */
+export const occurrenceId = (choreId: string, seq: number) => `${choreId}_${seq}`
 const choresOf = (db: Firestore, hid: string) => collection(db, 'households', hid, 'chores')
 
 function ruleFields(rule: ChoreRule) {
@@ -96,7 +101,7 @@ export async function createChore(
     createdAt: serverTimestamp(),
   })
   dates.forEach((dueDate, seq) => {
-    batch.set(doc(occurrencesOf(db, hid)), {
+    batch.set(doc(occurrencesOf(db, hid), occurrenceId(choreRef.id, seq)), {
       choreId: choreRef.id,
       choreTitle: title,
       roomId: input.roomId,
@@ -116,77 +121,112 @@ export async function createChore(
 
 /**
  * Tick off an occurrence (spec §8.2), in one transaction: mark it done by you; for "after it's done"
- * chores re-date the remaining queue from today (assignees keep their place); top the queue back up.
- * Throws "already done" if someone beat you to it. Returns what Undo needs.
+ * chores re-date the remaining queue from today (assignees keep their place); top the queue back up
+ * to its length; record the tick on the chore for Undo. Retries when someone ticked the same chore
+ * at the same moment. Throws "already done" if someone beat you to this occurrence.
  */
-export async function completeOccurrence(db: Firestore, hid: string, occurrenceId: string, user: Person, today: string): Promise<UndoToken> {
-  const occRef = doc(occurrencesOf(db, hid), occurrenceId)
-  // Transactions can't query: find the chore's other open occurrences first, re-read them inside.
+export async function completeOccurrence(db: Firestore, hid: string, occurrenceId_: string, user: Person, today: string): Promise<UndoToken> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await completeOnce(db, hid, occurrenceId_, user, today)
+    } catch (error) {
+      const code = (error as { code?: string }).code
+      // A concurrent tick of the same chore makes this attempt stale (rules or contention): re-read and retry.
+      if (attempt < 3 && (code === 'permission-denied' || code === 'aborted' || code === 'failed-precondition')) continue
+      throw error
+    }
+  }
+}
+
+async function completeOnce(db: Firestore, hid: string, occId: string, user: Person, today: string): Promise<UndoToken> {
+  const occRef = doc(occurrencesOf(db, hid), occId)
   const firstLook = (await getDoc(occRef)).data()
   if (!firstLook || firstLook.status !== 'open') throw new Error('This chore is already done.')
+  // Transactions can't query: find the chore's open occurrences first, re-read them inside.
   const siblings = await getDocs(query(occurrencesOf(db, hid), where('choreId', '==', firstLook.choreId), where('status', '==', 'open')))
 
   return runTransaction(db, async (tx) => {
-    const occSnap = await tx.get(occRef)
-    const occ = occSnap.data()
+    const occ = (await tx.get(occRef)).data()
     if (!occ || occ.status !== 'open') throw new Error('This chore is already done.')
     const choreRef = doc(choresOf(db, hid), occ.choreId)
     const chore = (await tx.get(choreRef)).data()
     if (!chore) throw new Error('This chore no longer exists.')
     const rule = ruleOf(chore)
-
-    const others = (await Promise.all(siblings.docs.filter((d) => d.id !== occurrenceId).map((d) => tx.get(d.ref))))
+    const others = (await Promise.all(siblings.docs.filter((d) => d.id !== occId).map((d) => tx.get(d.ref))))
       .filter((d) => d.data()?.status === 'open')
       .sort((a, b) => a.data()!.seq - b.data()!.seq)
 
     tx.update(occRef, { status: 'done', doneBy: user.uid, doneByName: user.displayName, doneAt: serverTimestamp() })
-    const token: UndoToken = { occurrenceId, choreId: occ.choreId, previousDates: [], toppedUpId: null, previousLastDoneAt: chore.lastDoneAt ?? null }
+    const token: UndoToken = { occurrenceId: occId, choreId: occ.choreId }
     if (rule.kind === 'oneoff') return token
 
-    const newDates = redate(rule, today, others.length)
+    // Re-date (interval) — computed from today in one go, so monthly chores don't drift off the 30th.
+    const needsTopUp = others.length < (chore.lookahead ?? LOOKAHEAD)
+    const fromToday = redate(rule, today, others.length + (needsTopUp ? 1 : 0))
+    const previousDates: LastTick['previousDates'] = []
     others.forEach((o, i) => {
-      if (newDates && newDates[i] !== o.data()!.dueDate) {
-        token.previousDates.push({ id: o.id, dueDate: o.data()!.dueDate })
-        tx.update(o.ref, { dueDate: newDates[i] })
+      if (fromToday && fromToday[i] !== o.data()!.dueDate) {
+        previousDates.push({ id: o.id, dueDate: o.data()!.dueDate })
+        tx.update(o.ref, { dueDate: fromToday[i] })
       }
     })
 
-    const lastOpen = newDates?.at(-1) ?? others.at(-1)?.data()?.dueDate
-    const topUp = lastOpen ? topUpDate(rule, lastOpen) : rule.kind === 'interval' ? redate(rule, today, 1)![0] : topUpDate(rule, occ.dueDate > today ? occ.dueDate : today)
-    const topUpRef = doc(occurrencesOf(db, hid))
-    tx.set(topUpRef, {
-      choreId: occ.choreId,
-      choreTitle: chore.title,
-      roomId: chore.roomId,
-      kind: chore.kind,
-      seq: chore.nextSeq,
-      dueDate: topUp,
-      status: 'open',
-      assigneeUid: null,
-      createdBy: user.uid,
-      createdByName: user.displayName,
-    })
-    tx.update(choreRef, { nextSeq: chore.nextSeq + 1, lastDoneAt: serverTimestamp() })
-    token.toppedUpId = topUpRef.id
+    let toppedUp: string | null = null
+    if (needsTopUp) {
+      const lastOpen = others.at(-1)?.data()?.dueDate as string | undefined
+      const dueDate = fromToday
+        ? fromToday[others.length]
+        : lastOpen
+          ? topUpDate(rule, lastOpen)
+          : topUpDate(rule, occ.dueDate > today ? occ.dueDate : today)
+      toppedUp = occurrenceId(occ.choreId, chore.nextSeq)
+      tx.set(doc(occurrencesOf(db, hid), toppedUp), {
+        choreId: occ.choreId,
+        choreTitle: chore.title,
+        roomId: chore.roomId,
+        kind: chore.kind,
+        seq: chore.nextSeq,
+        dueDate,
+        status: 'open',
+        assigneeUid: null,
+        createdBy: user.uid,
+        createdByName: user.displayName,
+      })
+    }
+    const lastTick: LastTick = { occurrenceId: occId, by: user.uid, toppedUp, previousDates, previousLastDoneAt: chore.lastDoneAt ?? null }
+    tx.update(choreRef, { ...(toppedUp ? { nextSeq: chore.nextSeq + 1 } : {}), lastDoneAt: serverTimestamp(), lastTick })
     return token
   })
 }
 
-/** Undo a completion you just made (within 10 minutes): exactly reverses completeOccurrence. */
+/**
+ * Undo your own tick (within 10 minutes), from the snackbar or History. If it was the chore's last
+ * tick, everything it changed is put back (dates, the added occurrence unless someone took it, last
+ * done); otherwise the occurrence is simply reopened.
+ */
 export async function undoCompletion(db: Firestore, hid: string, token: UndoToken): Promise<void> {
   await runTransaction(db, async (tx) => {
+    const occRef = doc(occurrencesOf(db, hid), token.occurrenceId)
     const choreRef = doc(choresOf(db, hid), token.choreId)
     const chore = (await tx.get(choreRef)).data()
-    const topUpRef = token.toppedUpId ? doc(occurrencesOf(db, hid), token.toppedUpId) : null
-    const topUp = topUpRef ? (await tx.get(topUpRef)).data() : undefined
+    const tick = chore?.lastTick as LastTick | undefined
+    const exact = !!tick && tick.occurrenceId === token.occurrenceId
+    const toppedUpRef = exact && tick.toppedUp ? doc(occurrencesOf(db, hid), tick.toppedUp) : null
+    const toppedUp = toppedUpRef ? (await tx.get(toppedUpRef)).data() : undefined
+    const datesStillOpen = exact
+      ? await Promise.all(tick.previousDates.map(async (p) => ({ ...p, open: (await tx.get(doc(occurrencesOf(db, hid), p.id))).data()?.status === 'open' })))
+      : []
 
-    tx.update(doc(occurrencesOf(db, hid), token.occurrenceId), { status: 'open', doneBy: deleteField(), doneByName: deleteField(), doneAt: deleteField() })
-    for (const { id, dueDate } of token.previousDates) tx.update(doc(occurrencesOf(db, hid), id), { dueDate })
-    // The top-up goes again unless someone has already taken it (then the queue stays one longer).
-    if (topUpRef && topUp && topUp.status === 'open' && topUp.assigneeUid === null && chore) {
-      tx.delete(topUpRef)
-      tx.update(choreRef, { nextSeq: chore.nextSeq - 1, lastDoneAt: token.previousLastDoneAt })
-    }
+    tx.update(occRef, { status: 'open', doneBy: deleteField(), doneByName: deleteField(), doneAt: deleteField() })
+    if (!exact || !chore) return
+    for (const p of datesStillOpen) if (p.open) tx.update(doc(occurrencesOf(db, hid), p.id), { dueDate: p.dueDate })
+    const removeTopUp = toppedUpRef && toppedUp?.status === 'open' && toppedUp.assigneeUid === null
+    if (removeTopUp) tx.delete(toppedUpRef)
+    tx.update(choreRef, {
+      ...(removeTopUp ? { nextSeq: chore.nextSeq - 1 } : {}),
+      lastDoneAt: tick.previousLastDoneAt ?? null,
+      lastTick: null,
+    })
   })
 }
 
@@ -291,7 +331,7 @@ export async function updateChore(
     if (existing) {
       batch.update(existing.ref, { dueDate, choreTitle: title, roomId })
     } else {
-      batch.set(doc(occurrencesOf(db, hid)), {
+      batch.set(doc(occurrencesOf(db, hid), occurrenceId(choreId, nextSeq)), {
         choreId, choreTitle: title, roomId, kind: rule.kind, seq: nextSeq, dueDate,
         status: 'open', assigneeUid: null, createdBy: chore.createdBy, createdByName: chore.createdByName,
       })

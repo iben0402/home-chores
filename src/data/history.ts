@@ -1,19 +1,16 @@
 import {
   collection,
   deleteDoc,
-  deleteField,
   doc,
-  getDocs,
   limit,
   onSnapshot,
   orderBy,
   query,
-  runTransaction,
   where,
   type Firestore,
   type Unsubscribe,
 } from 'firebase/firestore'
-import type { ChoreKind } from './chores'
+import { undoCompletion, type ChoreKind } from './chores'
 
 // History = occurrences that are done (spec §8.5, §9). Takes the Firestore instance first.
 
@@ -57,24 +54,9 @@ export function undoMinutesLeft(entry: HistoryEntry, uid: string, now: Date = ne
   return left > 0 ? Math.ceil(left) : 0
 }
 
-/**
- * Undo from History (your own tick, within 10 minutes): reopen it and remove the occurrence the tick
- * added to the queue, if nobody has taken it. Unlike the snackbar's Undo, the re-dated queue keeps
- * its new dates (the earlier dates aren't stored).
- */
+/** Undo from History (your own tick, within 10 minutes): the same exact undo as the snackbar's. */
 export async function undoFromHistory(db: Firestore, hid: string, entry: HistoryEntry): Promise<void> {
-  const open = await getDocs(query(occurrencesOf(db, hid), where('choreId', '==', entry.choreId), where('status', '==', 'open')))
-  await runTransaction(db, async (tx) => {
-    const choreRef = doc(db, 'households', hid, 'chores', entry.choreId)
-    const chore = (await tx.get(choreRef)).data()
-    const newest = chore ? open.docs.find((d) => d.data().seq === chore.nextSeq - 1) : undefined
-    const newestNow = newest ? (await tx.get(newest.ref)).data() : undefined
-    tx.update(doc(occurrencesOf(db, hid), entry.id), { status: 'open', doneBy: deleteField(), doneByName: deleteField(), doneAt: deleteField() })
-    if (chore && newest && newestNow?.status === 'open' && newestNow.assigneeUid === null && entry.kind !== 'oneoff') {
-      tx.delete(newest.ref)
-      tx.update(choreRef, { nextSeq: chore.nextSeq - 1 })
-    }
-  })
+  await undoCompletion(db, hid, { occurrenceId: entry.id, choreId: entry.choreId })
 }
 
 /** Admin: remove a wrong entry from History (the queue is not changed). */
