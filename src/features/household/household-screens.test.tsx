@@ -54,6 +54,8 @@ describe('Household tab', () => {
   test('people with roles, the invite, your account', () => {
     renderApp('/h/h1/household', ANNA)
     expect(screen.getByRole('heading', { name: 'Household' })).toBeInTheDocument()
+    // Its own title bar, as designed (no household header above it).
+    expect(screen.queryByRole('button', { name: /Switch household/ })).not.toBeInTheDocument()
     expect(screen.getByText(/^Flat on Main St · 3 people · 1 room$/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Your account/ })).toHaveAttribute('href', '/account')
     const people = screen.getByRole('list', { name: 'People' })

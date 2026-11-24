@@ -30,7 +30,7 @@ function HouseholdLayout() {
   const [wasMember, setWasMember] = useState(false)
   const [switching, setSwitching] = useState(false)
   // Tab screens show the household header; sub-pages (a room, Manage rooms, a chore) have their own back bar.
-  const subPage = /^\/h\/[^/]+\/(rooms|chores)\/.+/.test(useLocation().pathname)
+  const subPage = /^\/h\/[^/]+\/((rooms|chores)\/.+|household$)/.test(useLocation().pathname)
 
   useEffect(() => {
     if (!user) return
