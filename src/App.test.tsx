@@ -1,7 +1,13 @@
 import { render, screen } from '@testing-library/react'
-import App from './App'
+import { createMemoryRouter, RouterProvider } from 'react-router'
+import { routes } from './app/routes'
 
-test('renders the app name', () => {
-  render(<App />)
+test('renders the app name at /', () => {
+  render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />)
   expect(screen.getByRole('heading', { name: 'Home Chores' })).toBeInTheDocument()
+})
+
+test('shows the connected project in dev', () => {
+  render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />)
+  expect(screen.getByText('Project: demo-home-chores (emulators)')).toBeInTheDocument()
 })
