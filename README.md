@@ -1,4 +1,4 @@
-# Home Chores
+# Chours
 
 A simple app for sharing chores at home. Create an account, set up a household, invite family members or flatmates, and manage rooms and chores together.
 
