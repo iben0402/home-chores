@@ -72,8 +72,9 @@ service cloud.firestore {
     }
 
     match /invites/{code} {
-      // Look up a code you were given; never list them.
-      allow get: if signedIn();
+      // Look up a code you were given, signed in or not (the invite-link screen shows the
+      // household name before log-in). Never list them: codes are only known to whoever got one.
+      allow get: if true;
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['householdId', 'householdName', 'active', 'createdBy', 'createdAt'])
         && request.resource.data.active == true

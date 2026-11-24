@@ -158,9 +158,9 @@ describe('Create account: no early redirect', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/h/abc'))
   })
 
-  test('a signed-in visitor to /signup is sent on', () => {
+  test('a signed-in visitor to /signup is sent on (via / to Get started)', async () => {
     const { router } = renderApp('/signup', ANNA)
-    expect(router.state.location.pathname).toBe('/')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/start'))
   })
 })
 
@@ -216,9 +216,9 @@ describe('guards', () => {
     expect(router.state.location.search).toBe('?next=%2Fh%2Fabc%2Fhistory')
   })
 
-  test('sends signed-in users from /login to /', () => {
+  test('sends signed-in users from /login to / (which opens Get started without households)', async () => {
     const { router } = renderApp('/login', ANNA)
-    expect(router.state.location.pathname).toBe('/')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/start'))
     expect(screen.getByRole('heading', { name: 'Hi Anna' })).toBeInTheDocument()
   })
 
@@ -229,6 +229,7 @@ describe('guards', () => {
 
   test('never follows next to another site', async () => {
     const { router } = renderApp('/login?next=%2F%2Fevil.example', ANNA)
-    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/start'))
+    expect(router.state.location.pathname + router.state.location.search).not.toContain('evil')
   })
 })

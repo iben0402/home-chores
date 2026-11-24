@@ -296,7 +296,7 @@ Helpers:
 |---|---|---|---|---|
 | `users/{uid}` | self, or anyone who shares a household with them (*builder's call: simplify to signed-in users*) | self | self | — |
 | `users/{uid}/notifications/{n}` | owner | the sender, if `fromUid == auth.uid`, both are members of `householdId`, `read == false` and `type` is allowed | owner, `read` field only | owner |
-| `invites/{code}` | `get` by any signed-in user, never `list` | admin of `householdId`, `active == true` | admin of `householdId` (`active` and `householdName` only) | — |
+| `invites/{code}` | `get` by anyone, signed in or not (the invite-link screen shows the household name before log-in); never `list` | admin of `householdId`, `active == true` | admin of `householdId` (`active` and `householdName` only) | — |
 | `households/{hid}` | any signed-in user (`get` only; see the join preview in §8.7) | signed in, `adminUids == [auth.uid]`, `createdBy == auth.uid` | admin. `adminUids` must not be empty, and `createdBy` can't change | admin |
 | `members/{uid}` (incl. collection group) | any signed-in user for this household's members (join preview), plus the user's own doc via the collection group | (a) self as creator of a new household, checked with `getAfter`; or (b) self with a valid `inviteCode` for this `hid` | self (displayName/photoURL) | self (leave) or admin (remove) |
 | `rooms/{r}` | member | admin | admin | admin, but not when `isDefault` |

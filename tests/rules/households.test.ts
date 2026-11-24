@@ -19,6 +19,7 @@ import {
   getHouseholdPreview,
   isMember,
   joinHousehold,
+  watchMembership,
 } from '../../src/data/households'
 import { dbAs, startEnv } from './setup'
 
@@ -81,6 +82,22 @@ describe('invites and joining', () => {
       name: 'Flat on Main St',
       members: [{ uid: 'alice', displayName: 'Alice Nowak', color: 1, admin: true }],
     })
+  })
+
+  test('a signed-out visitor can look up an invite code (the 5a screen shows the household name)', async () => {
+    const { hid, code } = await aliceHousehold()
+    expect(await findInvite(dbAs(env, null), code)).toEqual({ status: 'ok', householdId: hid, householdName: 'Flat on Main St' })
+  })
+
+  test('watchMembership reports joining', async () => {
+    const { hid, code } = await aliceHousehold()
+    const bob = dbAs(env, 'bob')
+    const seen: boolean[] = []
+    const stop = watchMembership(bob, hid, 'bob', (member) => seen.push(member))
+    await joinHousehold(bob, BOB, code, hid)
+    await expect.poll(() => seen.at(-1)).toBe(true)
+    expect(seen[0]).toBe(false)
+    stop()
   })
 
   test('denied: preview when signed out, listing invites', async () => {

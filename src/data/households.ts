@@ -114,6 +114,11 @@ export async function joinHousehold(db: Firestore, user: Person, code: string, h
   })
 }
 
+/** Live: whether `uid` is (still) a member of the household. */
+export function watchMembership(db: Firestore, hid: string, uid: string, onChange: (member: boolean) => void, onError?: (e: Error) => void): Unsubscribe {
+  return onSnapshot(doc(db, 'households', hid, 'members', uid), (snap) => onChange(snap.exists()), onError)
+}
+
 /** Live list of the households you belong to, by name. */
 export function watchMyHouseholds(db: Firestore, uid: string, onChange: (households: HouseholdSummary[]) => void, onError?: (e: Error) => void): Unsubscribe {
   return onSnapshot(
