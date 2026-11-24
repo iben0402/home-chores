@@ -1,6 +1,7 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { IconButton } from './IconButton'
+import { useModal } from './useModal'
 
 /**
  * Modal sheet from the bottom. Rendered outside the app root, which is made inert while it's open
@@ -10,24 +11,7 @@ import { IconButton } from './IconButton'
 export function BottomSheet({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const titleId = useId()
-  const closeRef = useRef(onClose)
-  useEffect(() => {
-    closeRef.current = onClose
-  }, [onClose])
-
-  useEffect(() => {
-    const trigger = document.activeElement as HTMLElement | null
-    const root = document.getElementById('root')
-    if (root) root.inert = true
-    ref.current?.focus()
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeRef.current()
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      if (root) root.inert = false
-      trigger?.focus?.()
-    }
-  }, [])
+  useModal(onClose, ref)
 
   return createPortal(
     <>

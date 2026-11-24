@@ -1,4 +1,15 @@
 import {
+  Bath,
+  BedDouble,
+  CookingPot,
+  EllipsisVertical,
+  GripVertical,
+  Pencil,
+  Shirt,
+  Sofa,
+  Sprout,
+  Trash,
+  Trash2,
   Bell,
   Calendar,
   CalendarDays,
@@ -35,6 +46,17 @@ import {
 
 // Lucide icons in use, by the names the design system uses. Add here as screens need more.
 const icons = {
+  'bath': Bath,
+  'bed-double': BedDouble,
+  'cooking-pot': CookingPot,
+  'ellipsis-vertical': EllipsisVertical,
+  'grip-vertical': GripVertical,
+  'pencil': Pencil,
+  'shirt': Shirt,
+  'sofa': Sofa,
+  'sprout': Sprout,
+  'trash': Trash,
+  'trash-2': Trash2,
   bell: Bell,
   calendar: Calendar,
   'calendar-days': CalendarDays,

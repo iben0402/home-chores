@@ -32,3 +32,19 @@ vi.mock('../data/households', async (importOriginal) => {
     }),
   }
 })
+
+// Rooms: a household starts with General; tests override.
+vi.mock('../data/rooms', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../data/rooms')>()
+  return {
+    ...real,
+    watchRooms: vi.fn((_db, _hid, cb) => {
+      cb([{ id: 'general', name: 'General', icon: 'house', order: 0, isDefault: true }])
+      return () => {}
+    }),
+    addRoom: vi.fn(),
+    updateRoom: vi.fn(),
+    reorderRooms: vi.fn(),
+    deleteRoom: vi.fn(),
+  }
+})
