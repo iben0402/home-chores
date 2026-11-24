@@ -155,7 +155,9 @@ To avoid clutter, the Today view shows **only the earliest open occurrence per c
 
 ### 8.7 Households, invites and membership
 - **Create a household:** one batch writes the household doc, with you in `adminUids`, your member doc, and the "General" room.
-- **Invite:** each household has one active invite code: 8 characters from an alphabet without look-alike characters (no 0/O or 1/I). It's stored as `invites/{code}` → `{ householdId }`. The share link is `/join/{code}`. Admins can regenerate the code, which deletes the old invite doc. Codes don't expire on their own.
+- **Invite:** each household has one active invite code: 8 characters from an alphabet without look-alike characters (no 0/O or 1/I), shown as `K7QM-4XRT`. It's stored as `invites/{code}` → `{ householdId, householdName, active }`. The share link is `/join/{code}`. Admins can regenerate the code. The old invite doc is kept with `active: false`, so someone using it is told "That code has been replaced with a new one." and not "doesn't match". Codes don't expire on their own.
+- **Join preview (decided 2026-11-24):** before joining, the confirmation screen shows the household name and its members' first names, avatars and Admin badges. Without a server, the rules let **any signed-in user who knows a household's ID** read the household doc and its members. Household IDs are random and only reachable through an invite code, and member docs hold no emails. A Cloud Function (Blaze) would be the stricter alternative.
+- **Member colours:** each member doc gets `color` 1–10 (the design system's member identity colours). It's the lowest colour not already used in the household, or `(count % 10) + 1` once all are taken. A rare duplicate from two people joining at the same moment is acceptable.
 - **Join:** a signed-in user opens `/join/{code}`. The app reads the invite to get the household ID, then creates `households/{hid}/members/{uid}`. Rules allow creating your *own* member doc only when the invite's `householdId` matches. If you aren't signed in, the link sends you to login or signup and then returns you to the join page.
 - **Remove a member or leave:** one batch deletes the member doc, removes the user from `adminUids` if they're an admin, and unassigns all their **open** occurrences. Their past completions stay in history under the name repeated on each occurrence.
 - **Promote or demote:** edits `household.adminUids`. Rules forbid an empty `adminUids`.
@@ -209,6 +211,8 @@ users/{uid}/notifications/{nid}
 
 invites/{code}
   householdId: string
+  householdName: string        // copied in, so the invite screens can show it
+  active: boolean              // false once replaced by a newer code
   createdBy: string
   createdAt: Timestamp
 
@@ -222,6 +226,7 @@ households/{hid}
 households/{hid}/members/{uid}
   uid: string                  // repeats the doc ID so collection-group queries can filter on it
   displayName: string
+  color: number                // 1–10, member identity colour (see §8.7)
   photoURL?: string
   joinedAt: Timestamp
   inviteCode?: string          // the code used to join; checked by rules on create
@@ -291,9 +296,9 @@ Helpers:
 |---|---|---|---|---|
 | `users/{uid}` | self, or anyone who shares a household with them (*builder's call: simplify to signed-in users*) | self | self | — |
 | `users/{uid}/notifications/{n}` | owner | the sender, if `fromUid == auth.uid`, both are members of `householdId`, `read == false` and `type` is allowed | owner, `read` field only | owner |
-| `invites/{code}` | `get` by any signed-in user, never `list` | admin of `householdId` | — | admin of `householdId` |
-| `households/{hid}` | member | signed in, `adminUids == [auth.uid]`, `createdBy == auth.uid` | admin. `adminUids` must not be empty, and `createdBy` can't change | admin |
-| `members/{uid}` (incl. collection group) | household members, plus the user's own doc via the collection group | (a) self as creator of a new household, checked with `getAfter`; or (b) self with a valid `inviteCode` for this `hid` | self (displayName/photoURL) | self (leave) or admin (remove) |
+| `invites/{code}` | `get` by any signed-in user, never `list` | admin of `householdId`, `active == true` | admin of `householdId` (`active` and `householdName` only) | — |
+| `households/{hid}` | any signed-in user (`get` only; see the join preview in §8.7) | signed in, `adminUids == [auth.uid]`, `createdBy == auth.uid` | admin. `adminUids` must not be empty, and `createdBy` can't change | admin |
+| `members/{uid}` (incl. collection group) | any signed-in user for this household's members (join preview), plus the user's own doc via the collection group | (a) self as creator of a new household, checked with `getAfter`; or (b) self with a valid `inviteCode` for this `hid` | self (displayName/photoURL) | self (leave) or admin (remove) |
 | `rooms/{r}` | member | admin | admin | admin, but not when `isDefault` |
 | `chores/{c}` | member | admin; or a member if `kind == "oneoff"` and `createdBy == auth.uid` | admin; or the creator for oneoff; or any member changing only `nextSeq` and `lastDoneAt` (completion flow) | admin; or the creator for oneoff |
 | `occurrences/{o}` | member | admin; or a member creating an open, unassigned occurrence for an existing chore (top-up), or the first occurrence of their own one-off | see below | admin; the creator of a oneoff; or the person who ticked it during the undo window (top-up occurrence only) |
