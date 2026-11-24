@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChoreRow } from '../../components/ChoreRow'
+import { Fab } from '../../components/Fab'
 import type { ChoreFilter } from '../../components/FilterChips'
 import { SectionHeader } from '../../components/SectionHeader'
 import { Snackbar } from '../../components/Snackbar'
@@ -18,7 +19,7 @@ type Snack = { message: string; undo?: UndoToken } | null
  * The sectioned chore list for Today and a room: tick off (row holds, then fades; snackbar with Undo),
  * and Take it. A ticked row stays as a "ghost" for its leaving animation after Firestore drops it.
  */
-export function ChoreListView({ hid, occurrences, filter, roomId, rooms, members, showRoom = true }: {
+export function ChoreListView({ hid, occurrences, filter, roomId, rooms, members, showRoom = true, fab }: {
   hid: string
   occurrences: Occurrence[]
   filter: ChoreFilter
@@ -26,6 +27,8 @@ export function ChoreListView({ hid, occurrences, filter, roomId, rooms, members
   rooms: Map<string, Room>
   members: Map<string, Member>
   showRoom?: boolean
+  /** The floating add button; the list owns it so it can lift above the snackbar. */
+  fab?: { to: string; label?: string }
 }) {
   const { user } = useAuth()
   const today = todayISO()
@@ -111,6 +114,7 @@ export function ChoreListView({ hid, occurrences, filter, roomId, rooms, members
           </div>
         </section>
       ))}
+      {fab && <Fab to={fab.to} label={fab.label} lifted={!!snack} />}
       {snack && <Snackbar message={snack.message} onAction={snack.undo ? () => void undo(snack.undo!) : undefined} />}
     </>
   )

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
 import { EmptyState } from '../../components/EmptyState'
-import { Fab } from '../../components/Fab'
 import { FilterChips, type ChoreFilter } from '../../components/FilterChips'
 import { Icon } from '../../components/Icon'
 import { InfoNote } from '../../components/InfoNote'
@@ -65,12 +64,8 @@ export function TodayPage() {
     <div className="pb-28">
       <h1 className="m-0 px-4 pt-2 text-title">Today</h1>
       <FilterChips value={filter} onChange={setFilter} counts={counts} />
-      {counts[filter] === 0 ? (
-        <p className="m-0 px-4 py-10 text-center text-body text-fg-muted">{EMPTY_FILTER[filter]}</p>
-      ) : (
-        <ChoreListView hid={household.id} occurrences={occurrences} filter={filter} rooms={roomMap} members={members} />
-      )}
-      <Fab to={`/h/${household.id}/chores/new`} />
+      {counts[filter] === 0 && <p className="m-0 px-4 py-10 text-center text-body text-fg-muted">{EMPTY_FILTER[filter]}</p>}
+      <ChoreListView hid={household.id} occurrences={occurrences} filter={filter} rooms={roomMap} members={members} fab={{ to: `/h/${household.id}/chores/new` }} />
     </div>
   )
 }

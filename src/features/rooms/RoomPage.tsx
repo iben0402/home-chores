@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router'
 import { EmptyState } from '../../components/EmptyState'
-import { Fab } from '../../components/Fab'
 import { Icon } from '../../components/Icon'
 import { TopBar } from '../../components/TopBar'
 import { todayISO } from '../../lib/schedule'
@@ -59,8 +58,7 @@ export function RoomPage() {
               {counts.open} open{counts.overdue > 0 ? ` · ${counts.overdue} overdue` : ''}
             </span>
           </div>
-          <ChoreListView hid={household.id} occurrences={occurrences} filter="everyone" roomId={room.id} rooms={roomMap} members={members} showRoom={false} />
-          <Fab to={addLink} label="Add chore" />
+          <ChoreListView hid={household.id} occurrences={occurrences} filter="everyone" roomId={room.id} rooms={roomMap} members={members} showRoom={false} fab={{ to: addLink, label: 'Add chore' }} />
         </div>
       )}
     </>

@@ -90,6 +90,8 @@ describe('Today', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Mark done: Vacuuming' }))
     expect(completeOccurrence).toHaveBeenCalledWith(expect.anything(), 'h1', 'vac1', { uid: 'u1', displayName: 'Anna Nowak' }, today)
     expect(await screen.findByText('Vacuuming — done')).toBeInTheDocument()
+    // The New chore button lifts out of the snackbar's way.
+    expect(screen.getByRole('link', { name: 'New chore' })).toHaveClass('-translate-y-[60px]')
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(undoCompletion).toHaveBeenCalledWith(expect.anything(), 'h1', token)
   })
