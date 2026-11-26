@@ -4,7 +4,7 @@ import type { Firestore } from 'firebase/firestore'
 
 export async function startEnv(): Promise<RulesTestEnvironment> {
   return initializeTestEnvironment({
-    projectId: 'demo-home-chores',
+    projectId: 'demo-home-chores-rules', // not the dev app's project: tests clear the database
     firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 },
   })
 }

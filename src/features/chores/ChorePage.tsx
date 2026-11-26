@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { Avatar } from '../../components/Avatar'
 import { Button } from '../../components/Button'
 import { DueBadge } from '../../components/DueBadge'
@@ -25,6 +25,7 @@ import { useMembers, useOpenOccurrences } from './useHouseholdData'
 /** One chore: when it comes round, the next times (each with its own person), recent history. */
 export function ChorePage() {
   const { choreId = '' } = useParams()
+  const location = useLocation()
   const household = useHousehold()
   const isAdmin = useIsAdmin()
   const { user } = useAuth()
@@ -48,11 +49,24 @@ export function ChorePage() {
   if (chore === undefined || !occurrences || !user) return null
   const back = `/h/${household.id}`
   if (chore === null) {
+    // Opened from a notification about a chore that's since been deleted.
+    const fromNotification = (location.state as { fromNotification?: string } | null)?.fromNotification
     return (
       <>
-        <TopBar title="Chore" back={back} />
-        <EmptyState icon="circle-alert" title="We couldn’t find that" body="It may have been deleted, or the link is out of date.">
-          <Link to={back} className="inline-flex min-h-[52px] w-full items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-[17px] font-semibold text-fg no-underline">
+        <TopBar title={fromNotification ? '' : 'Chore'} back={back} />
+        <EmptyState
+          {...(fromNotification
+            ? { icon: 'inbox' as const, title: 'This chore was removed', body: `${fromNotification} was deleted after this notification was sent, so there’s nothing to open.` }
+            : { icon: 'circle-alert' as const, title: 'We couldn’t find that', body: 'It may have been deleted, or the link is out of date.' })}
+        >
+          <Link
+            to={back}
+            className={
+              fromNotification
+                ? 'inline-flex min-h-[52px] w-full items-center justify-center rounded-md bg-primary px-5 text-[17px] font-semibold text-on-primary no-underline hover:bg-primary-hover'
+                : 'inline-flex min-h-[52px] w-full items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-[17px] font-semibold text-fg no-underline'
+            }
+          >
             Go to Today
           </Link>
         </EmptyState>

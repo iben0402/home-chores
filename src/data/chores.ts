@@ -15,8 +15,10 @@ import {
   writeBatch,
   type Firestore,
   type Unsubscribe,
+  type WriteBatch,
 } from 'firebase/firestore'
 import { initialDates, redate, todayISO, topUpDate, type ChoreRule } from '../lib/schedule'
+import { addNotification, senderIn, type NotificationContent } from './notifications'
 
 // Chore + occurrence data access (spec §7–§9). Takes the Firestore instance first (see households.ts).
 
@@ -115,6 +117,11 @@ export async function createChore(
       createdByName: user.displayName,
     })
   })
+  if (input.assigneeUid && input.assigneeUid !== user.uid) {
+    addNotification(batch, db, input.assigneeUid, await senderIn(db, hid, user.uid), {
+      type: 'assigned', choreId: choreRef.id, choreTitle: title, occurrenceId: occurrenceId(choreRef.id, 0), dueDate: dates[0],
+    })
+  }
   await batch.commit()
   return choreRef.id
 }
@@ -230,9 +237,22 @@ export async function undoCompletion(db: Firestore, hid: string, token: UndoToke
   })
 }
 
-/** Assign an open occurrence to someone (anyone may), or to nobody (yourself, or an admin for anyone). */
-export async function assignOccurrence(db: Firestore, hid: string, occurrenceId: string, assigneeUid: string | null, byUid: string): Promise<void> {
-  await updateDoc(doc(occurrencesOf(db, hid), occurrenceId), { assigneeUid, assignedBy: byUid })
+/**
+ * Assign an open occurrence to someone (anyone may), or to nobody (yourself, or an admin for anyone).
+ * Giving it to someone else notifies them in the same batch (spec §8.4).
+ */
+export async function assignOccurrence(db: Firestore, hid: string, occId: string, assigneeUid: string | null, byUid: string): Promise<void> {
+  const ref = doc(occurrencesOf(db, hid), occId)
+  if (!assigneeUid || assigneeUid === byUid) {
+    await updateDoc(ref, { assigneeUid, assignedBy: byUid })
+    return
+  }
+  const [occ, from] = await Promise.all([getDoc(ref), senderIn(db, hid, byUid)])
+  const o = occ.data()
+  const batch = writeBatch(db)
+  batch.update(ref, { assigneeUid, assignedBy: byUid })
+  if (o) addNotification(batch, db, assigneeUid, from, { type: 'assigned', choreId: o.choreId, choreTitle: o.choreTitle, occurrenceId: occId, dueDate: o.dueDate })
+  await batch.commit()
 }
 
 export type Chore = {
@@ -283,6 +303,7 @@ export async function updateChore(
   choreId: string,
   changes: { title?: string; description?: string; roomId?: string; dueDate?: string; rule?: ChoreRule; lookahead?: number },
   today: string,
+  byUid: string,
 ): Promise<void> {
   const choreRef = doc(choresOf(db, hid), choreId)
   const choreSnap = await getDoc(choreRef)
@@ -298,6 +319,28 @@ export async function updateChore(
   if (changes.description !== undefined) choreUpdate.description = changes.description.trim()
   if (changes.roomId !== undefined) choreUpdate.roomId = roomId
 
+  // Assignees hear about a new date or a new name (not about room or description changes).
+  const renamed = title !== chore.title
+  const notes: Array<{ to: string; content: NotificationContent }> = []
+  const renamedNotified = new Set<string>()
+  const noteFor = (o: (typeof open)[number], newDate: string | null) => {
+    const to = o.data().assigneeUid as string | null
+    if (!to || to === byUid) return
+    if (newDate && newDate !== o.data().dueDate) {
+      notes.push({ to, content: { type: 'changed', choreId, choreTitle: title, occurrenceId: o.id, dueDate: newDate } })
+    } else if (renamed && !renamedNotified.has(to)) {
+      renamedNotified.add(to)
+      notes.push({ to, content: { type: 'renamed', choreId, choreTitle: title, previousTitle: chore.title, occurrenceId: o.id } })
+    }
+  }
+  const commit = async () => {
+    if (notes.length) {
+      const from = await senderIn(db, hid, byUid)
+      notes.forEach((n) => addNotification(batch, db, n.to, from, n.content))
+    }
+    await batch.commit()
+  }
+
   const scheduleChanged = chore.kind !== 'oneoff' && (changes.rule !== undefined || changes.lookahead !== undefined)
   if (!scheduleChanged) {
     if (Object.keys(choreUpdate).length) batch.update(choreRef, choreUpdate)
@@ -305,10 +348,12 @@ export async function updateChore(
       const occUpdate: Record<string, unknown> = {}
       if (o.data().choreTitle !== title) occUpdate.choreTitle = title
       if (o.data().roomId !== roomId) occUpdate.roomId = roomId
-      if (chore.kind === 'oneoff' && changes.dueDate && o.data().dueDate !== changes.dueDate) occUpdate.dueDate = changes.dueDate
+      const newDate = chore.kind === 'oneoff' && changes.dueDate && o.data().dueDate !== changes.dueDate ? changes.dueDate : null
+      if (newDate) occUpdate.dueDate = newDate
       if (Object.keys(occUpdate).length) batch.update(o.ref, occUpdate)
+      noteFor(o, newDate)
     }
-    await batch.commit()
+    await commit()
     return
   }
 
@@ -330,6 +375,7 @@ export async function updateChore(
     const existing = open[i]
     if (existing) {
       batch.update(existing.ref, { dueDate, choreTitle: title, roomId })
+      noteFor(existing, dueDate)
     } else {
       batch.set(doc(occurrencesOf(db, hid), occurrenceId(choreId, nextSeq)), {
         choreId, choreTitle: title, roomId, kind: rule.kind, seq: nextSeq, dueDate,
@@ -338,29 +384,51 @@ export async function updateChore(
       nextSeq += 1
     }
   })
-  open.slice(dates.length).forEach((o) => batch.delete(o.ref))
+  for (const o of open.slice(dates.length)) {
+    batch.delete(o.ref)
+    removedNote(notes, o.data(), o.id, byUid)
+  }
   choreUpdate.nextSeq = nextSeq
   if (rule.kind !== chore.kind) open.slice(0, dates.length).forEach((o) => batch.update(o.ref, { kind: rule.kind }))
   if (rule.kind === 'calendar' && chore.kind === 'interval') choreUpdate.interval = deleteField()
   if (rule.kind === 'interval' && chore.kind === 'calendar') choreUpdate.calendar = deleteField()
   batch.update(choreRef, choreUpdate)
-  await batch.commit()
+  await commit()
+}
+
+/** Someone assigned to an occurrence that's going away hears about it. */
+function removedNote(notes: Array<{ to: string; content: NotificationContent }>, o: Record<string, unknown>, occId: string, byUid: string) {
+  const to = o.assigneeUid as string | null
+  if (!to || to === byUid) return
+  notes.push({ to, content: { type: 'removed', choreId: o.choreId as string, choreTitle: o.choreTitle as string, occurrenceId: occId, dueDate: o.dueDate as string } })
+}
+
+/** Removes the chore's open occurrences in the batch, notifying their assignees. */
+async function removeOpen(db: Firestore, hid: string, choreId: string, byUid: string, batch: WriteBatch) {
+  const open = await getDocs(query(occurrencesOf(db, hid), where('choreId', '==', choreId), where('status', '==', 'open')))
+  const notes: Array<{ to: string; content: NotificationContent }> = []
+  open.docs.forEach((o) => {
+    batch.delete(o.ref)
+    removedNote(notes, o.data(), o.id, byUid)
+  })
+  if (notes.length) {
+    const from = await senderIn(db, hid, byUid)
+    notes.forEach((n) => addNotification(batch, db, n.to, from, n.content))
+  }
 }
 
 /** Delete a chore and its open occurrences (done ones stay in History). Admin, or a one-off's creator. */
-export async function deleteChore(db: Firestore, hid: string, choreId: string): Promise<void> {
-  const open = await getDocs(query(occurrencesOf(db, hid), where('choreId', '==', choreId), where('status', '==', 'open')))
+export async function deleteChore(db: Firestore, hid: string, choreId: string, byUid: string): Promise<void> {
   const batch = writeBatch(db)
-  open.docs.forEach((o) => batch.delete(o.ref))
+  await removeOpen(db, hid, choreId, byUid, batch)
   batch.delete(doc(choresOf(db, hid), choreId))
   await batch.commit()
 }
 
 /** Admin: archive a repeating chore — its upcoming occurrences go; the chore and its history stay. */
-export async function archiveChore(db: Firestore, hid: string, choreId: string): Promise<void> {
-  const open = await getDocs(query(occurrencesOf(db, hid), where('choreId', '==', choreId), where('status', '==', 'open')))
+export async function archiveChore(db: Firestore, hid: string, choreId: string, byUid: string): Promise<void> {
   const batch = writeBatch(db)
-  open.docs.forEach((o) => batch.delete(o.ref))
+  await removeOpen(db, hid, choreId, byUid, batch)
   batch.update(doc(choresOf(db, hid), choreId), { archived: true })
   await batch.commit()
 }

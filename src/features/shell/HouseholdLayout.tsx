@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
-import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import { AppHeader } from '../../components/AppHeader'
 import { OfflineNotice } from '../../components/OfflineNotice'
 import { TabBar } from '../../components/TabBar'
 import { watchHousehold, watchMembership, type Household } from '../../data/households'
+import { markAllNotificationsRead, markNotificationRead, type AppNotification } from '../../data/notifications'
+import { useMediaQuery } from '../../lib/useMediaQuery'
+import { NotificationsPanel } from '../notifications/NotificationsPanel'
+import { useNotifications } from '../notifications/useNotifications'
 import { db } from '../../lib/firebase'
 import { setLastHousehold } from '../../lib/lastHousehold'
 import { useAuth } from '../auth/useAuth'
@@ -29,6 +33,12 @@ function HouseholdLayout() {
   // Was a member during this visit: losing membership then means "removed", not "never in it".
   const [wasMember, setWasMember] = useState(false)
   const [switching, setSwitching] = useState(false)
+  const [bellOpen, setBellOpen] = useState(false)
+  const bellRef = useRef<HTMLButtonElement>(null)
+  const notifications = useNotifications(user?.uid)
+  const { households } = useMyHouseholds()
+  const desktop = useMediaQuery('(min-width: 768px)')
+  const navigate = useNavigate()
   // Tab screens show the household header; sub-pages (a room, Manage rooms, a chore) have their own back bar.
   const subPage = /^\/h\/[^/]+\/((rooms|chores)\/.+|household$)/.test(useLocation().pathname)
 
@@ -60,10 +70,27 @@ function HouseholdLayout() {
   if (member === false || household === null) return <Navigate to="/" replace state={{ notMemberOf: hid }} />
   if (member === undefined || household === undefined) return null
 
+  function openNotification(n: AppNotification) {
+    if (!n.read) markNotificationRead(db, user!.uid, n.id).catch(() => {})
+    // A removed chore has nothing to open: tapping only marks it read.
+    if (n.type === 'removed') return
+    setBellOpen(false)
+    navigate(`/h/${n.householdId}/chores/${n.choreId}`, { state: { fromNotification: n.choreTitle } })
+  }
+
   // Content sits in the centred column; the header and tab bar span the full window width.
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-fg">
-      {!subPage && <AppHeader household={household.name} onSwitch={() => setSwitching(true)} />}
+      {!subPage && (
+        <AppHeader
+          household={household.name}
+          onSwitch={() => setSwitching(true)}
+          unread={notifications.unread}
+          onBell={() => setBellOpen((o) => !o)}
+          bellOpen={bellOpen}
+          bellRef={bellRef}
+        />
+      )}
       <div className="mx-auto flex w-full max-w-(--size-content) flex-1 flex-col">
         <OfflineNotice className="mx-4 mb-2" />
         <main className="flex-1">
@@ -74,6 +101,18 @@ function HouseholdLayout() {
         <TabBar hid={hid} />
       </div>
       {switching && <SwitcherSheet current={hid} onClose={() => setSwitching(false)} />}
+      {bellOpen && (
+        <NotificationsPanel
+          state={notifications.state}
+          multiHousehold={households.length > 1}
+          desktop={desktop}
+          bellRef={bellRef}
+          onOpen={openNotification}
+          onMarkAllRead={() => markAllNotificationsRead(db, user!.uid).catch(() => {})}
+          onRetry={notifications.retry}
+          onClose={() => setBellOpen(false)}
+        />
+      )}
     </div>
   )
 }

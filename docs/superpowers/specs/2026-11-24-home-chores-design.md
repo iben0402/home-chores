@@ -151,7 +151,7 @@ To avoid clutter, the Today view shows **only the earliest open occurrence per c
 - **Editing the schedule:** for interval chores, open occurrences are re-dated from the last completion, or from the first due date if it has never been done. For calendar chores, open occurrences are re-dated to the next matching dates under the new rule. Either way, they're re-dated in `seq` order and assignees are kept.
 - **Lowering lookahead:** deletes open occurrences from the end of the queue and notifies their assignees. **Raising it:** adds new unassigned occurrences.
 - **Delete or archive:** deleting removes the chore and its open occurrences. Done occurrences stay in history, which keeps the repeated title and room. Archiving hides the chore and deletes its open occurrences. *Builder's call:* offer archive only for repeating chores, and delete for one-off chores.
-- People assigned to open occurrences that are deleted or significantly changed (re-dated or retitled) get a notification of type `chore_changed` or `chore_deleted`.
+- People assigned to open occurrences that are deleted or significantly changed (re-dated or retitled) get a notification: `changed` (new date), `renamed` or `removed` (decided with the notifications design, 2026-11-26).
 
 ### 8.7 Households, invites and membership
 - **Create a household:** one batch writes the household doc, with you in `adminUids`, your member doc, and the "General" room.
@@ -183,7 +183,8 @@ To avoid clutter, the Today view shows **only the earliest open occurrence per c
 - Created by **another client**, the one that assigns the chore. Rules check that:
   - the sender is signed in and `fromUid == request.auth.uid`;
   - both sender and recipient are members of the `householdId` in the notification;
-  - the notification is created unread, with type `assigned`, `chore_changed` or `chore_deleted`.
+  - the notification is created unread, with type `assigned`, `changed`, `renamed` or `removed`;
+  - `fromName` and `fromColor` match the sender's member doc and `householdName` the household's name.
 - The bell in the header shows the unread count, read live. Opening the panel lists the newest 30. Clicking one opens the household and occurrence it's about and marks it read. A "mark all read" button is included.
 - *Builder's call:* notifications older than 60 days aren't shown. Nothing cleans them up because there's no server.
 - *Known limitation:* a member could misuse a valid assignment to send unwanted notifications. Within a household that's acceptable.
@@ -198,15 +199,17 @@ users/{uid}
   createdAt: Timestamp
 
 users/{uid}/notifications/{nid}
-  type: "assigned" | "chore_changed" | "chore_deleted"
+  type: "assigned" | "changed" | "renamed" | "removed"
   householdId: string
   householdName: string        // copied in, so the inbox can show it without reading the household
   occurrenceId?: string
   choreId: string
   choreTitle: string
+  previousTitle?: string       // renamed: the old title
   dueDate?: string             // "YYYY-MM-DD"
   fromUid: string
   fromName: string
+  fromColor: number            // sender's member colour, for the avatar
   read: boolean
   createdAt: Timestamp (serverTimestamp)
 
@@ -288,7 +291,7 @@ Design notes:
 - `occurrences`: `status ASC, doneAt DESC`
 - `occurrences`: `status ASC, roomId ASC, doneAt DESC`
 - `occurrences`: `status ASC, doneBy ASC, doneAt DESC`
-- `notifications`: `read ASC, createdAt DESC`
+- `notifications`: none needed (newest 30 since 60 days ago is single-field; "mark all read" queries `read == false`).
 - Collection-group exemption: a single-field index on `members.uid`.
 
 ## 10. Security rules (outline)
