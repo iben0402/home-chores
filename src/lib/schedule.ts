@@ -179,3 +179,13 @@ export function formFromRule(rule: ChoreRule): ScheduleForm {
   if (rule.kind === 'calendar') return { ...base, mode: 'calendar', calMode: 'week', days: DAYS.filter((d) => rule.weekdays.includes(d.index)).map((d) => d.key) }
   return base
 }
+
+/**
+ * When the next one is due if the current one is completed (or skipped) on `doneISO`: interval chores
+ * count from then; calendar chores keep their dates (the next open one, or the next match).
+ */
+export function nextDueAfter(rule: ChoreRule, doneISO: string, currentDue: string, laterOpen: string[]): string | null {
+  if (rule.kind === 'oneoff') return null
+  if (rule.kind === 'interval') return addInterval(doneISO, rule.every, rule.unit)
+  return laterOpen[0] ?? nextCalendarDate(rule, currentDue > doneISO ? currentDue : doneISO, false)
+}

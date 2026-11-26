@@ -14,6 +14,8 @@ const entry = (e: Partial<HistoryEntry> & { id: string; choreTitle: string }): H
   roomId: 'general',
   kind: 'interval',
   seq: 0,
+  status: 'done',
+  dueDate: '2026-11-24',
   doneBy: 'u1',
   doneByName: 'Anna Nowak',
   doneAt: minutesAgo(2),

@@ -20,7 +20,8 @@ Fixed in `fix/chores-rules`: the rules holes C1, I1, I2, M3, M4 (occurrences now
 
 ### History
 10. **History loads the latest 200 entries**; older ones aren't reachable yet (no "load more").
-11. **"Open chore" and skipped entries** aren't in the entry sheet or the list yet; they need the chore page and Skip (chores part 3).
+11. **"Open chore"** isn't in the History entry sheet yet. (Skipped entries are listed since `feat/skip`.)
+12. **Skipping someone's chore doesn't notify them** (no notification type for it in the design yet).
 
 ### Product question
 - **"Mine" on Today** currently shows everything assigned to you, including later occurrences. Spec §8.9 could also be read as "the next of each chore, plus later ones assigned to you".

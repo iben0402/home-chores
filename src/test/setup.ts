@@ -75,6 +75,7 @@ vi.mock('../data/chores', async (importOriginal) => {
       return () => {}
     }),
     completeOccurrence: vi.fn(),
+    skipOccurrence: vi.fn(),
     undoCompletion: vi.fn(),
     takeOccurrence: vi.fn(),
   }
