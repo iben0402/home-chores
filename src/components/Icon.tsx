@@ -1,5 +1,7 @@
 import {
   Inbox,
+  CheckCheck,
+  TriangleAlert,
   UserRoundMinus,
   ArrowUpRight,
   CircleCheck,
@@ -55,6 +57,8 @@ import {
 // Lucide icons in use, by the names the design system uses. Add here as screens need more.
 const icons = {
   'inbox': Inbox,
+  'check-check': CheckCheck,
+  'triangle-alert': TriangleAlert,
   'user-round-minus': UserRoundMinus,
   'arrow-up-right': ArrowUpRight,
   'circle-check': CircleCheck,

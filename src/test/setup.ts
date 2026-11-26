@@ -93,3 +93,17 @@ vi.mock('../data/history', async (importOriginal) => {
     deleteEntry: vi.fn(),
   }
 })
+
+// Notifications: an empty inbox; tests override.
+vi.mock('../data/notifications', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../data/notifications')>()
+  return {
+    ...real,
+    watchNotifications: vi.fn((_db, _uid, _now, cb) => {
+      cb([])
+      return () => {}
+    }),
+    markNotificationRead: vi.fn(async () => {}),
+    markAllNotificationsRead: vi.fn(async () => {}),
+  }
+})

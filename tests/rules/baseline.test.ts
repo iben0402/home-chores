@@ -11,7 +11,7 @@ let testEnv: RulesTestEnvironment
 
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
-    projectId: 'demo-home-chores',
+    projectId: 'demo-home-chores-rules', // not the dev app's project: tests clear the database
     firestore: {
       rules: readFileSync('firestore.rules', 'utf8'),
       host: '127.0.0.1',

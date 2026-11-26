@@ -82,6 +82,7 @@ function EditForm({ chore, isAdmin, back }: { chore: Chore; isAdmin: boolean; ba
           ? { title: title.trim(), description: note.trim(), roomId, dueDate: dueValue }
           : { title: title.trim(), description: note.trim(), roomId, rule: ruleFromForm(schedule), lookahead },
         today,
+        user!.uid,
       )
       if (oneoff && next && whoValue !== next.assigneeUid) await assignOccurrence(db, household.id, next.id, whoValue, user!.uid)
       navigate(back, { replace: true })
@@ -94,8 +95,8 @@ function EditForm({ chore, isAdmin, back }: { chore: Chore; isAdmin: boolean; ba
   async function remove() {
     setBusy(true)
     try {
-      if (oneoff) await deleteChore(db, household.id, chore.id)
-      else await archiveChore(db, household.id, chore.id)
+      if (oneoff) await deleteChore(db, household.id, chore.id, user!.uid)
+      else await archiveChore(db, household.id, chore.id, user!.uid)
       navigate(`/h/${household.id}`, { replace: true })
     } catch {
       setConfirming(false)

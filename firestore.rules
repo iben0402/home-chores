@@ -260,6 +260,31 @@ service cloud.firestore {
       }
     }
 
+    // In-app notifications (spec §8.10). Only the recipient reads, marks read or deletes them.
+    // Anyone may send one to another member of a household they're in, signed with their own
+    // member name and colour and the household's real name.
+    match /users/{uid}/notifications/{nid} {
+      function validNotification() {
+        let n = request.resource.data;
+        let hid = n.householdId;
+        let sender = get(memberDoc(hid, me())).data;
+        return n.keys().hasAll(['type', 'householdId', 'householdName', 'choreId', 'choreTitle', 'fromUid', 'fromName', 'fromColor', 'read', 'createdAt'])
+          && n.keys().hasOnly(['type', 'householdId', 'householdName', 'choreId', 'occurrenceId', 'choreTitle', 'previousTitle', 'dueDate', 'fromUid', 'fromName', 'fromColor', 'read', 'createdAt'])
+          && n.type in ['assigned', 'changed', 'renamed', 'removed']
+          && n.read == false && n.createdAt == request.time && n.fromUid == me()
+          && hid is string && n.choreId is string && validName(n.choreTitle)
+          && n.get('occurrenceId', '') is string
+          && (n.get('previousTitle', null) == null || validName(n.previousTitle))
+          && (n.get('dueDate', null) == null || (n.dueDate is string && n.dueDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+          && exists(memberDoc(hid, uid))
+          && n.fromName == sender.displayName && n.fromColor == sender.color
+          && n.householdName == get(household(hid)).data.name;
+      }
+      allow read, delete: if signedIn() && uid == me();
+      allow update: if signedIn() && uid == me() && onlyChanged(['read']) && request.resource.data.read == true;
+      allow create: if signedIn() && uid != me() && validNotification();
+    }
+
     // "My households": a collection-group query for my own member docs.
     match /{path=**}/members/{memberId} {
       allow read: if signedIn() && resource.data.uid == me();

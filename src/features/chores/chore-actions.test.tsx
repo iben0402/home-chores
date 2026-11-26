@@ -128,7 +128,7 @@ describe('editing', () => {
     expect(updateChore).toHaveBeenCalledWith(expect.anything(), 'h1', 'vac', {
       title: 'Hoover', description: 'Under the sofa too', roomId: 'kitchen',
       rule: { kind: 'interval', every: 1, unit: 'week' }, lookahead: 3,
-    }, today)
+    }, today, 'u1')
     await waitFor(() => expect(router.state.location.pathname).toBe('/h/h1/chores/vac'))
   })
 
@@ -138,7 +138,7 @@ describe('editing', () => {
     await user.click(screen.getByRole('button', { name: 'Archive chore' }))
     expect(screen.getByRole('alertdialog', { name: 'Archive Vacuuming?' })).toHaveAccessibleDescription('Its 2 upcoming times are removed. History stays.')
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Archive' }))
-    expect(archiveChore).toHaveBeenCalledWith(expect.anything(), 'h1', 'vac')
+    expect(archiveChore).toHaveBeenCalledWith(expect.anything(), 'h1', 'vac', 'u1')
     await waitFor(() => expect(router.state.location.pathname).toBe('/h/h1'))
   })
 
@@ -150,7 +150,7 @@ describe('editing', () => {
     expect(screen.getByText('You added this one-off chore, so you can change or delete it.')).toBeInTheDocument()
     await user.selectOptions(screen.getByLabelText('Who does it?'), 'u1')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
-    expect(updateChore).toHaveBeenCalledWith(expect.anything(), 'h1', 'kettle', expect.objectContaining({ title: 'Descale the kettle', dueDate: today }), today)
+    expect(updateChore).toHaveBeenCalledWith(expect.anything(), 'h1', 'kettle', expect.objectContaining({ title: 'Descale the kettle', dueDate: today }), today, 'u1')
     expect(assignOccurrence).toHaveBeenCalledWith(expect.anything(), 'h1', 'kettle0', 'u1', 'u1')
   })
 
@@ -162,7 +162,7 @@ describe('editing', () => {
     const dialog = screen.getByRole('alertdialog', { name: 'Delete Descale the kettle?' })
     expect(dialog).toHaveAccessibleDescription('It’s removed from everyone’s list. Nothing is added to History.')
     await user.click(within(dialog).getByRole('button', { name: 'Delete chore' }))
-    expect(deleteChore).toHaveBeenCalledWith(expect.anything(), 'h1', 'kettle')
+    expect(deleteChore).toHaveBeenCalledWith(expect.anything(), 'h1', 'kettle', 'u1')
   })
 
   test('someone else’s one-off can’t be edited by a member', async () => {

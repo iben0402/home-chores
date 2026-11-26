@@ -63,7 +63,7 @@ describe('editing and deleting', () => {
   test('the creator edits their one-off: words, room, date, who', async () => {
     const { hid, kitchen, general } = await setup()
     const choreId = await createChore(dbAs(env, 'bob'), hid, BOB, { title: 'Descale', roomId: kitchen, rule: { kind: 'oneoff' }, startISO: '2026-11-24' })
-    await assertSucceeds(updateChore(dbAs(env, 'bob'), hid, choreId, { title: 'Descale the kettle', description: 'Vinegar', roomId: general, dueDate: '2026-12-04' }, '2026-11-24'))
+    await assertSucceeds(updateChore(dbAs(env, 'bob'), hid, choreId, { title: 'Descale the kettle', description: 'Vinegar', roomId: general, dueDate: '2026-12-04' }, '2026-11-24', 'bob'))
     expect((await open(hid, choreId))[0]).toMatchObject({ choreTitle: 'Descale the kettle', roomId: general, dueDate: '2026-12-04' })
     expect((await getDoc(doc(dbAs(env, 'bob'), 'households', hid, 'chores', choreId))).data()).toMatchObject({ title: 'Descale the kettle', description: 'Vinegar' })
   })
@@ -72,16 +72,16 @@ describe('editing and deleting', () => {
     const { hid, kitchen } = await setup()
     const oneoff = await createChore(dbAs(env, 'bob'), hid, BOB, { title: 'Descale', roomId: kitchen, rule: { kind: 'oneoff' }, startISO: '2026-11-24' })
     const weekly = await createChore(dbAs(env, 'alice'), hid, ALICE, { title: 'Vacuuming', roomId: kitchen, rule: WEEKLY, startISO: '2026-11-24' })
-    await assertFails(updateChore(dbAs(env, 'carol'), hid, oneoff, { title: 'Mine now' }, '2026-11-24'))
-    await assertFails(deleteChore(dbAs(env, 'carol'), hid, oneoff))
-    await assertFails(updateChore(dbAs(env, 'bob'), hid, weekly, { title: 'Bob’s' }, '2026-11-24'))
-    await assertFails(archiveChore(dbAs(env, 'bob'), hid, weekly))
+    await assertFails(updateChore(dbAs(env, 'carol'), hid, oneoff, { title: 'Mine now' }, '2026-11-24', 'carol'))
+    await assertFails(deleteChore(dbAs(env, 'carol'), hid, oneoff, 'carol'))
+    await assertFails(updateChore(dbAs(env, 'bob'), hid, weekly, { title: 'Bob’s' }, '2026-11-24', 'bob'))
+    await assertFails(archiveChore(dbAs(env, 'bob'), hid, weekly, 'bob'))
   })
 
   test('the creator deletes their one-off; it leaves Today', async () => {
     const { hid, kitchen } = await setup()
     const choreId = await createChore(dbAs(env, 'bob'), hid, BOB, { title: 'Descale', roomId: kitchen, rule: { kind: 'oneoff' }, startISO: '2026-11-24' })
-    await assertSucceeds(deleteChore(dbAs(env, 'bob'), hid, choreId))
+    await assertSucceeds(deleteChore(dbAs(env, 'bob'), hid, choreId, 'bob'))
     expect(await open(hid, choreId)).toEqual([])
   })
 
@@ -90,20 +90,20 @@ describe('editing and deleting', () => {
     const choreId = await createChore(dbAs(env, 'alice'), hid, ALICE, { title: 'Vacuuming', roomId: kitchen, rule: WEEKLY, startISO: '2026-11-24' })
     const occs = await open(hid, choreId)
     await assignOccurrence(dbAs(env, 'bob'), hid, occs[1].id, 'bob', 'bob')
-    await updateChore(dbAs(env, 'alice'), hid, choreId, { title: 'Hoover', rule: { kind: 'interval', every: 2, unit: 'week' }, lookahead: 3 }, '2026-11-24')
+    await updateChore(dbAs(env, 'alice'), hid, choreId, { title: 'Hoover', rule: { kind: 'interval', every: 2, unit: 'week' }, lookahead: 3 }, '2026-11-24', 'alice')
     expect((await open(hid, choreId)).map((o) => [o.seq, o.dueDate, o.assigneeUid, o.choreTitle])).toEqual([
       [0, '2026-11-24', null, 'Hoover'],
       [1, '2026-12-08', 'bob', 'Hoover'],
       [2, '2026-12-22', null, 'Hoover'],
     ])
-    await updateChore(dbAs(env, 'alice'), hid, choreId, { lookahead: 5 }, '2026-11-24')
+    await updateChore(dbAs(env, 'alice'), hid, choreId, { lookahead: 5 }, '2026-11-24', 'alice')
     expect((await open(hid, choreId)).map((o) => o.dueDate)).toEqual(['2026-11-24', '2026-12-08', '2026-12-22', '2027-01-05', '2027-01-19'])
   })
 
   test('admin archives a repeating chore: upcoming ones go, the chore is kept', async () => {
     const { hid, kitchen } = await setup()
     const choreId = await createChore(dbAs(env, 'alice'), hid, ALICE, { title: 'Vacuuming', roomId: kitchen, rule: WEEKLY, startISO: '2026-11-24' })
-    await assertSucceeds(archiveChore(dbAs(env, 'alice'), hid, choreId))
+    await assertSucceeds(archiveChore(dbAs(env, 'alice'), hid, choreId, 'alice'))
     expect(await open(hid, choreId)).toEqual([])
     expect((await getDoc(doc(dbAs(env, 'alice'), 'households', hid, 'chores', choreId))).data()?.archived).toBe(true)
   })
