@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore'
 import { undoCompletion, type ChoreKind } from './chores'
 
-// History = occurrences that are done (spec §8.5, §9). Takes the Firestore instance first.
+// History = occurrences that are done or skipped (spec §8.3, §8.5, §9). Takes the Firestore instance first.
 
 export const UNDO_MINUTES = 10
 
@@ -23,6 +23,10 @@ export type HistoryEntry = {
   roomId: string
   kind: ChoreKind
   seq: number
+  /** done, or skipped by `doneBy` (an admin), with an optional reason. */
+  status: 'done' | 'skipped'
+  skipReason?: string
+  dueDate: string
   doneBy: string
   doneByName: string
   doneAt: Date
@@ -33,7 +37,7 @@ const occurrencesOf = (db: Firestore, hid: string) => collection(db, 'households
 /** Live history, newest first (the latest `max` entries). */
 export function watchHistory(db: Firestore, hid: string, onChange: (entries: HistoryEntry[]) => void, onError?: (e: Error) => void, max = 200): Unsubscribe {
   return onSnapshot(
-    query(occurrencesOf(db, hid), where('status', '==', 'done'), orderBy('doneAt', 'desc'), limit(max)),
+    query(occurrencesOf(db, hid), where('status', 'in', ['done', 'skipped']), orderBy('doneAt', 'desc'), limit(max)),
     (snap) =>
       onChange(
         snap.docs

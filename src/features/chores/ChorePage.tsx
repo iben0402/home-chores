@@ -4,7 +4,7 @@ import { Avatar } from '../../components/Avatar'
 import { Button } from '../../components/Button'
 import { DueBadge } from '../../components/DueBadge'
 import { EmptyState } from '../../components/EmptyState'
-import { Icon } from '../../components/Icon'
+import { Icon, type IconName } from '../../components/Icon'
 import { SectionHeader } from '../../components/SectionHeader'
 import { Snackbar } from '../../components/Snackbar'
 import { TopBar } from '../../components/TopBar'
@@ -19,6 +19,7 @@ import { useRooms } from '../rooms/useRooms'
 import { useHousehold } from '../shell/useHousehold'
 import { useIsAdmin } from '../shell/useIsAdmin'
 import { AssignSheet } from './AssignSheet'
+import { SkipDialog } from './SkipDialog'
 import { useChore } from './useChore'
 import { useMembers, useOpenOccurrences } from './useHouseholdData'
 
@@ -35,8 +36,9 @@ export function ChorePage() {
   const rooms = useRooms(household.id)
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [assigning, setAssigning] = useState<Occurrence | null>(null)
-  const [snack, setSnack] = useState<{ message: string; undo?: UndoToken } | null>(null)
+  const [snack, setSnack] = useState<{ message: string; undo?: UndoToken; icon?: IconName } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [skipping, setSkipping] = useState(false)
   const today = todayISO()
 
   useEffect(() => watchHistory(db, household.id, (all) => setHistory(all.filter((e) => e.choreId === choreId))), [household.id, choreId])
@@ -78,7 +80,10 @@ export function ChorePage() {
   const upcoming = occurrences.filter((o) => o.choreId === chore.id).sort((a, b) => a.seq - b.seq)
   const room = rooms?.find((r) => r.id === chore.roomId)
   const canEdit = isAdmin || (chore.kind === 'oneoff' && chore.createdBy === user.uid)
-  const last = history[0]
+  const lastDone = history.find((e) => e.status !== 'skipped')
+  // The latest entry was a skip: say so, and mark the one that's now next.
+  const skipped = history[0]?.status === 'skipped' ? history[0] : undefined
+  const canSkip = isAdmin && chore.kind !== 'oneoff'
   const nameOf = (uid: string | null) => (uid === user.uid ? 'You' : uid ? firstName(members.get(uid)?.displayName) : 'Nobody yet')
 
   async function assign(o: Occurrence, uid: string | null) {
@@ -127,9 +132,12 @@ export function ChorePage() {
           <Icon name={chore.kind === 'oneoff' ? 'circle-dot' : 'repeat-2'} className="mt-px shrink-0 text-primary" />
           <span>
             <strong className="font-semibold">{chore.kind === 'oneoff' ? `One-off chore, added by ${chore.createdBy === user.uid ? 'you' : firstName(chore.createdByName)}.` : describeSchedule(formFromRule(chore.rule))}</strong>
-            {last && (
+            {(skipped || lastDone) && (
               <span className="mt-0.5 block text-[13px] leading-[18px] text-fg-muted">
-                Last done {dayLabel(last.doneAt)} by {last.doneBy === user.uid ? 'you' : firstName(last.doneByName)}
+                {[
+                  skipped && `${dueLabel(skipped.dueDate, today)} skipped by ${skipped.doneBy === user.uid ? 'you' : firstName(skipped.doneByName)}`,
+                  lastDone && `${skipped ? 'last' : 'Last'} done ${dayLabel(lastDone.doneAt)} by ${lastDone.doneBy === user.uid ? 'you' : firstName(lastDone.doneByName)}`,
+                ].filter(Boolean).join(' · ')}
               </span>
             )}
           </span>
@@ -141,12 +149,15 @@ export function ChorePage() {
         <section aria-labelledby="next-times">
           <SectionHeader id="next-times" tone="week" label={upcoming.length === 1 ? 'Next time' : `Next ${upcoming.length} times`} />
           <div role="list" className="[&>*+*]:border-t [&>*+*]:border-border">
-            {upcoming.map((o) => {
+            {upcoming.map((o, i) => {
               const date = dueLabel(o.dueDate, today)
               const member = o.assigneeUid ? members.get(o.assigneeUid) : undefined
               return (
                 <div role="listitem" key={o.id} className="flex min-h-[60px] items-center gap-3 bg-surface py-2 pr-2 pl-4">
-                  <span className="flex-1 text-[16px] leading-[22px] font-medium">{date}</span>
+                  <span className="flex flex-1 flex-col text-[16px] leading-[22px] font-medium">
+                    {date}
+                    {i === 0 && skipped && <small className="text-[13px] leading-[18px] font-normal text-fg-muted">This one’s next</small>}
+                  </span>
                   <button
                     type="button"
                     aria-label={`${date}: ${o.assigneeUid ? `assigned to ${o.assigneeUid === user.uid ? 'you' : firstName(member?.displayName) || 'someone'}` : 'nobody yet'}. Change`}
@@ -179,9 +190,11 @@ export function ChorePage() {
             {history.slice(0, 3).map((e) => (
               <div role="listitem" key={e.id} className="flex min-h-14 items-center gap-3 bg-surface px-4 py-2">
                 <span className="flex flex-1 flex-col">
-                  <span className="text-body-medium">Done by {e.doneBy === user.uid ? 'you' : firstName(e.doneByName)}</span>
+                  <span className="text-body-medium">
+                    {e.status === 'skipped' ? `Skipped by ${e.doneBy === user.uid ? 'you' : firstName(e.doneByName)}` : `Done by ${e.doneBy === user.uid ? 'you' : firstName(e.doneByName)}`}
+                  </span>
                   <span className="text-[13px] leading-[18px] text-fg-muted">
-                    {dayLabel(e.doneAt)}, {timeLabel(e.doneAt)}
+                    {e.status === 'skipped' ? [dueLabel(e.dueDate, today), e.skipReason].filter(Boolean).join(' · ') : `${dayLabel(e.doneAt)}, ${timeLabel(e.doneAt)}`}
                   </span>
                 </span>
                 <Avatar name={e.doneByName} color={members.get(e.doneBy)?.color ?? 8} size="sm" />
@@ -193,8 +206,13 @@ export function ChorePage() {
 
       {upcoming.length > 0 && (
         <div className="fixed inset-x-0 bottom-[calc(var(--size-tabbar)+env(safe-area-inset-bottom))] z-(--z-fab) flex justify-center border-t border-border bg-surface">
-          <div className="w-full max-w-(--size-content) px-4 pt-3 pb-4">
-            <Button variant="primary" size="lg" block icon="check" loading={busy} onClick={() => void markDone()}>
+          <div className="flex w-full max-w-(--size-content) gap-2 px-4 pt-3 pb-4">
+            {canSkip && (
+              <Button variant="secondary" size="lg" icon="skip-forward" disabled={busy} onClick={() => setSkipping(true)} className="shrink-0">
+                Skip
+              </Button>
+            )}
+            <Button variant="primary" size="lg" block icon="check" loading={busy} onClick={() => void markDone()} className="flex-1">
               Mark done
             </Button>
           </div>
@@ -204,9 +222,28 @@ export function ChorePage() {
       {assigning && (
         <AssignSheet occurrence={assigning} members={members} me={user.uid} isAdmin={isAdmin} onAssign={(uid) => void assign(assigning, uid)} onClose={() => setAssigning(null)} />
       )}
+      {skipping && upcoming[0] && (
+        <SkipDialog
+          hid={household.id}
+          occurrence={upcoming[0]}
+          laterOpen={upcoming.slice(1)}
+          members={members}
+          me={me}
+          onSkipped={(token) => {
+            setSkipping(false)
+            setSnack({ message: 'Skipped', icon: 'skip-forward', undo: token })
+          }}
+          onFailed={() => {
+            setSkipping(false)
+            setSnack({ message: 'Couldn’t skip it. Try again.' })
+          }}
+          onCancel={() => setSkipping(false)}
+        />
+      )}
       {snack && (
         <Snackbar
           message={snack.message}
+          icon={snack.icon}
           onAction={
             snack.undo
               ? () => {

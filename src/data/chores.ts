@@ -38,6 +38,7 @@ export type Occurrence = {
   assignedBy?: string
   doneBy?: string
   doneByName?: string
+  skipReason?: string
   createdBy: string
   createdByName: string
 }
@@ -133,9 +134,22 @@ export async function createChore(
  * at the same moment. Throws "already done" if someone beat you to this occurrence.
  */
 export async function completeOccurrence(db: Firestore, hid: string, occurrenceId_: string, user: Person, today: string): Promise<UndoToken> {
+  return withRetry(() => completeOnce(db, hid, occurrenceId_, user, today, null))
+}
+
+/**
+ * Admin: skip an occurrence (spec §8.3). The same steps as completing — logged in History as
+ * skipped by you, with an optional reason; "after it's done" chores re-date from today; the queue
+ * is topped up — and Undo works the same way.
+ */
+export async function skipOccurrence(db: Firestore, hid: string, occId: string, user: Person, today: string, reason = ''): Promise<UndoToken> {
+  return withRetry(() => completeOnce(db, hid, occId, user, today, { reason: reason.trim().slice(0, 200) }))
+}
+
+async function withRetry(run: () => Promise<UndoToken>): Promise<UndoToken> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await completeOnce(db, hid, occurrenceId_, user, today)
+      return await run()
     } catch (error) {
       const code = (error as { code?: string }).code
       // A concurrent tick of the same chore makes this attempt stale (rules or contention): re-read and retry.
@@ -145,7 +159,7 @@ export async function completeOccurrence(db: Firestore, hid: string, occurrenceI
   }
 }
 
-async function completeOnce(db: Firestore, hid: string, occId: string, user: Person, today: string): Promise<UndoToken> {
+async function completeOnce(db: Firestore, hid: string, occId: string, user: Person, today: string, skip: { reason: string } | null): Promise<UndoToken> {
   const occRef = doc(occurrencesOf(db, hid), occId)
   const firstLook = (await getDoc(occRef)).data()
   if (!firstLook || firstLook.status !== 'open') throw new Error('This chore is already done.')
@@ -163,7 +177,13 @@ async function completeOnce(db: Firestore, hid: string, occId: string, user: Per
       .filter((d) => d.data()?.status === 'open')
       .sort((a, b) => a.data()!.seq - b.data()!.seq)
 
-    tx.update(occRef, { status: 'done', doneBy: user.uid, doneByName: user.displayName, doneAt: serverTimestamp() })
+    tx.update(occRef, {
+      status: skip ? 'skipped' : 'done',
+      doneBy: user.uid,
+      doneByName: user.displayName,
+      doneAt: serverTimestamp(),
+      ...(skip?.reason ? { skipReason: skip.reason } : {}),
+    })
     const token: UndoToken = { occurrenceId: occId, choreId: occ.choreId }
     if (rule.kind === 'oneoff') return token
 
@@ -214,6 +234,7 @@ async function completeOnce(db: Firestore, hid: string, occId: string, user: Per
 export async function undoCompletion(db: Firestore, hid: string, token: UndoToken): Promise<void> {
   await runTransaction(db, async (tx) => {
     const occRef = doc(occurrencesOf(db, hid), token.occurrenceId)
+    const occ = (await tx.get(occRef)).data()
     const choreRef = doc(choresOf(db, hid), token.choreId)
     const chore = (await tx.get(choreRef)).data()
     const tick = chore?.lastTick as LastTick | undefined
@@ -224,7 +245,13 @@ export async function undoCompletion(db: Firestore, hid: string, token: UndoToke
       ? await Promise.all(tick.previousDates.map(async (p) => ({ ...p, open: (await tx.get(doc(occurrencesOf(db, hid), p.id))).data()?.status === 'open' })))
       : []
 
-    tx.update(occRef, { status: 'open', doneBy: deleteField(), doneByName: deleteField(), doneAt: deleteField() })
+    tx.update(occRef, {
+      status: 'open',
+      doneBy: deleteField(),
+      doneByName: deleteField(),
+      doneAt: deleteField(),
+      ...(occ?.skipReason !== undefined ? { skipReason: deleteField() } : {}),
+    })
     if (!exact || !chore) return
     for (const p of datesStillOpen) if (p.open) tx.update(doc(occurrencesOf(db, hid), p.id), { dueDate: p.dueDate })
     const removeTopUp = toppedUpRef && toppedUp?.status === 'open' && toppedUp.assigneeUid === null

@@ -109,7 +109,12 @@ export function HistoryPage() {
                   {group.entries.map((e) => {
                     const left = undoMinutesLeft(e, user.uid)
                     const member = members.get(e.doneBy)
-                    const meta = [timeLabel(e.doneAt), who(e), left > 0 && `undo until ${timeLabel(new Date(e.doneAt.getTime() + UNDO_MINUTES * 60000))}`].filter(Boolean).join(' · ')
+                    const meta = [
+                      e.status !== 'skipped' && timeLabel(e.doneAt),
+                      who(e),
+                      e.status === 'skipped' && e.skipReason,
+                      left > 0 && `undo until ${timeLabel(new Date(e.doneAt.getTime() + UNDO_MINUTES * 60000))}`,
+                    ].filter(Boolean).join(' · ')
                     return (
                       <div role="listitem" key={e.id}>
                         <button type="button" onClick={() => setOpen(e)} className="flex min-h-(--size-row) w-full cursor-pointer items-start gap-3 bg-surface px-4 py-3 text-left hover:bg-surface-hover active:bg-surface-sunken">
@@ -117,7 +122,7 @@ export function HistoryPage() {
                             <span className="line-clamp-2 text-body-medium text-fg">{e.choreTitle}</span>
                             <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-[18px] text-fg-muted">
                               {roomMap.get(e.roomId) && <span>{roomMap.get(e.roomId)!.name}</span>}
-                              <DueBadge status="done" label="Done" />
+                              {e.status === 'skipped' ? <DueBadge status="skipped" label="Skipped" /> : <DueBadge status="done" label="Done" />}
                               <span>{meta}</span>
                             </span>
                           </div>
@@ -151,11 +156,11 @@ export function HistoryPage() {
       {open && (
         <BottomSheet
           title={open.choreTitle}
-          subtitle={`Done by ${open.doneBy === user.uid ? 'you' : firstName(open.doneByName)} · ${dayLabel(open.doneAt)}, ${timeLabel(open.doneAt)}${roomMap.get(open.roomId) ? ` · ${roomMap.get(open.roomId)!.name}` : ''}`}
+          subtitle={`${open.status === 'skipped' ? 'Skipped' : 'Done'} by ${open.doneBy === user.uid ? 'you' : firstName(open.doneByName)} · ${dayLabel(open.doneAt)}, ${timeLabel(open.doneAt)}${roomMap.get(open.roomId) ? ` · ${roomMap.get(open.roomId)!.name}` : ''}${open.skipReason ? ` · ${open.skipReason}` : ''}`}
           onClose={() => setOpen(null)}
         >
           {undoMinutesLeft(open, user.uid) > 0 && (
-            <SheetAction icon="undo-2" label="Undo — not done yet" trail={`${undoMinutesLeft(open, user.uid)} min left`} onClick={() => void undo(open)} />
+            <SheetAction icon="undo-2" label={open.status === 'skipped' ? 'Undo skip' : 'Undo — not done yet'} trail={`${undoMinutesLeft(open, user.uid)} min left`} onClick={() => void undo(open)} />
           )}
           {isAdmin && (
             <>
@@ -180,7 +185,7 @@ export function HistoryPage() {
       {confirmDelete && (
         <ConfirmDialog
           title="Delete this entry?"
-          body={`${confirmDelete.choreTitle}, done by ${confirmDelete.doneBy === user.uid ? 'you' : firstName(confirmDelete.doneByName)} ${dayPhrase(confirmDelete.doneAt)}, is removed from History for everyone. Use this for entries made by mistake.`}
+          body={`${confirmDelete.choreTitle}, ${confirmDelete.status === 'skipped' ? 'skipped' : 'done'} by ${confirmDelete.doneBy === user.uid ? 'you' : firstName(confirmDelete.doneByName)} ${dayPhrase(confirmDelete.doneAt)}, is removed from History for everyone. Use this for entries made by mistake.`}
           confirmLabel="Delete entry"
           onCancel={() => setConfirmDelete(null)}
           onConfirm={() => void remove(confirmDelete)}

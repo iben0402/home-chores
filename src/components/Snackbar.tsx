@@ -1,12 +1,12 @@
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 
 /** Brief confirmation with an optional Undo. Sits above the tab bar; announced politely. */
-export function Snackbar({ message, actionLabel = 'Undo', onAction }: { message: string; actionLabel?: string; onAction?: () => void }) {
+export function Snackbar({ message, icon = 'circle-check', actionLabel = 'Undo', onAction }: { message: string; icon?: IconName; actionLabel?: string; onAction?: () => void }) {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--size-tabbar)+0.75rem+env(safe-area-inset-bottom))] z-(--z-snackbar) flex justify-center px-3">
       <div role="status" className="pointer-events-auto flex min-h-12 w-full max-w-(--size-content) animate-snackbar-in items-center gap-3 rounded-md bg-surface-inverse py-1 pr-1 pl-4 text-[15px] leading-5 text-fg-inverse shadow-md">
         <span className="flex min-w-0 flex-1 items-center gap-2">
-          <Icon name="circle-check" />
+          <Icon name={icon} />
           <span>{message}</span>
         </span>
         {onAction && (

@@ -15,11 +15,13 @@ import { buildChoreList } from './choreList'
 import { AssignSheet } from './AssignSheet'
 import { BottomSheet } from '../../components/BottomSheet'
 import { SheetAction } from '../../components/SheetAction'
+import type { IconName } from '../../components/Icon'
 import { Icon } from '../../components/Icon'
 import { Link } from 'react-router'
 import { useIsAdmin } from '../shell/useIsAdmin'
+import { SkipDialog } from './SkipDialog'
 
-type Snack = { message: string; undo?: UndoToken } | null
+type Snack = { message: string; undo?: UndoToken; icon?: IconName } | null
 
 /**
  * The sectioned chore list for Today and a room: tick off (row holds, then fades; snackbar with Undo),
@@ -39,7 +41,7 @@ export function ChoreListView({ hid, occurrences, filter, roomId, rooms, members
   const { user } = useAuth()
   const isAdmin = useIsAdmin()
   const today = todayISO()
-  const [sheet, setSheet] = useState<{ kind: 'actions' | 'assign'; occurrence: Occurrence } | null>(null)
+  const [sheet, setSheet] = useState<{ kind: 'actions' | 'assign' | 'skip'; occurrence: Occurrence } | null>(null)
   const [ghosts, setGhosts] = useState<Map<string, Occurrence>>(new Map())
   const [snack, setSnack] = useState<Snack>(null)
   const timers = useRef<number[]>([])
@@ -152,20 +154,39 @@ export function ChoreListView({ hid, occurrences, filter, roomId, rooms, members
           }}
           onUnassign={() => void assign(sheet.occurrence, null)}
           onAssignTo={() => setSheet({ kind: 'assign', occurrence: sheet.occurrence })}
+          onSkip={isAdmin && sheet.occurrence.kind !== 'oneoff' ? () => setSheet({ kind: 'skip', occurrence: sheet.occurrence }) : undefined}
           onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet?.kind === 'skip' && (
+        <SkipDialog
+          hid={hid}
+          occurrence={sheet.occurrence}
+          laterOpen={occurrences.filter((o) => o.choreId === sheet.occurrence.choreId && o.seq > sheet.occurrence.seq).sort((a, b) => a.seq - b.seq)}
+          members={members}
+          me={me}
+          onSkipped={(token) => {
+            setSheet(null)
+            showSnack({ message: 'Skipped', icon: 'skip-forward', undo: token })
+          }}
+          onFailed={() => {
+            setSheet(null)
+            showSnack({ message: 'Couldn’t skip it. Try again.' })
+          }}
+          onCancel={() => setSheet(null)}
         />
       )}
       {sheet?.kind === 'assign' && (
         <AssignSheet occurrence={sheet.occurrence} members={members} me={me.uid} isAdmin={isAdmin} onAssign={(uid) => void assign(sheet.occurrence, uid)} onClose={() => setSheet(null)} />
       )}
       {fab && <Fab to={fab.to} label={fab.label} lifted={!!snack} />}
-      {snack && <Snackbar message={snack.message} onAction={snack.undo ? () => void undo(snack.undo!) : undefined} />}
+      {snack && <Snackbar message={snack.message} icon={snack.icon} onAction={snack.undo ? () => void undo(snack.undo!) : undefined} />}
     </>
   )
 }
 
-/** Row actions: Take it / Unassign me, Assign to…, Open chore. */
-function RowSheet({ occurrence, subtitle, me, hid, onTake, onUnassign, onAssignTo, onClose }: {
+/** Row actions: Take it / Unassign me, Assign to…, Skip this time (admin), Open chore. */
+function RowSheet({ occurrence, subtitle, me, hid, onTake, onUnassign, onAssignTo, onSkip, onClose }: {
   occurrence: Occurrence
   subtitle: string
   me: string
@@ -173,6 +194,7 @@ function RowSheet({ occurrence, subtitle, me, hid, onTake, onUnassign, onAssignT
   onTake: () => void
   onUnassign: () => void
   onAssignTo: () => void
+  onSkip?: () => void
   onClose: () => void
 }) {
   return (
@@ -180,6 +202,7 @@ function RowSheet({ occurrence, subtitle, me, hid, onTake, onUnassign, onAssignT
       {occurrence.assigneeUid === null && <SheetAction icon="hand" label="Take it" onClick={onTake} />}
       {occurrence.assigneeUid === me && <SheetAction icon="user-round-minus" label="Unassign me" onClick={onUnassign} />}
       <SheetAction icon="user-round-plus" label="Assign to…" onClick={onAssignTo} />
+      {onSkip && <SheetAction icon="skip-forward" label="Skip this time" trail="Admin" onClick={onSkip} />}
       <div role="separator" className="mx-5 my-1 h-px bg-border" />
       <Link to={`/h/${hid}/chores/${occurrence.choreId}`} className="flex min-h-14 w-full items-center gap-4 px-5 text-body-medium text-fg no-underline hover:bg-surface-hover">
         <Icon name="arrow-up-right" size={22} className="text-fg-muted" />

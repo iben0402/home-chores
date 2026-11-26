@@ -1,5 +1,6 @@
 import {
   addDays,
+  nextDueAfter,
   addMonths,
   describeSchedule,
   dueLabel,
@@ -123,4 +124,17 @@ describe('schedule editor summary', () => {
     expect(previewDates(form({ mode: 'calendar', calMode: 'week', days: ['mon'] }), '2026-11-24')).toEqual(['Mon 30 Nov', 'Mon 7 Dec', 'Mon 14 Dec'])
     expect(previewDates(form({ mode: 'once' }), '2026-11-24')).toEqual([])
   })
+})
+
+describe('nextDueAfter (skip / complete confirmation)', () => {
+  test('interval: counts from the day it’s done or skipped', () => {
+    expect(nextDueAfter({ kind: 'interval', every: 1, unit: 'week' }, '2026-12-05', '2026-12-05', ['2026-12-12'])).toBe('2026-12-12')
+    expect(nextDueAfter({ kind: 'interval', every: 2, unit: 'day' }, '2026-12-08', '2026-12-05', ['2026-12-07'])).toBe('2026-12-10')
+  })
+  test('calendar: the next open one keeps its date, else the next match', () => {
+    const mondays = { kind: 'calendar', freq: 'weekly', weekdays: [1] } as const
+    expect(nextDueAfter(mondays, '2026-12-02', '2026-11-30', ['2026-12-07'])).toBe('2026-12-07')
+    expect(nextDueAfter(mondays, '2026-12-02', '2026-11-30', [])).toBe('2026-12-07')
+  })
+  test('one-off: nothing next', () => expect(nextDueAfter({ kind: 'oneoff' }, '2026-12-02', '2026-12-02', [])).toBeNull())
 })

@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react'
+import { useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from './Button'
 import type { IconName } from './Icon'
@@ -9,13 +9,17 @@ type ConfirmDialogProps = {
   body: string
   confirmLabel: string
   confirmIcon?: IconName
+  /** Destructive by default; primary for actions that aren't (e.g. Skip). */
+  confirmVariant?: 'destructive' | 'primary'
   loading?: boolean
+  /** Extra content between the body and the buttons (e.g. an optional field). */
+  children?: ReactNode
   onConfirm: () => void
   onCancel: () => void
 }
 
 /** Modal confirmation for destructive actions. Cancel is focused first, so Enter never destroys. */
-export function ConfirmDialog({ title, body, confirmLabel, confirmIcon = 'trash-2', loading, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ title, body, confirmLabel, confirmIcon = 'trash-2', confirmVariant = 'destructive', loading, onConfirm, onCancel, children }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null)
   const titleId = useId()
   const bodyId = useId()
@@ -37,6 +41,7 @@ export function ConfirmDialog({ title, body, confirmLabel, confirmIcon = 'trash-
         <p id={bodyId} className="m-0 text-body text-fg-muted">
           {body}
         </p>
+        {children}
         <div className="mt-6 flex flex-wrap-reverse justify-end gap-2">
           <button
             ref={cancelRef}
@@ -46,7 +51,7 @@ export function ConfirmDialog({ title, body, confirmLabel, confirmIcon = 'trash-
           >
             Cancel
           </button>
-          <Button variant="destructive" icon={confirmIcon} loading={loading} onClick={onConfirm}>
+          <Button variant={confirmVariant} icon={confirmIcon} loading={loading} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>
