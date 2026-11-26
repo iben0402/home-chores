@@ -70,7 +70,8 @@ function HouseholdLayout() {
           <Outlet context={household} />
         </main>
       </div>
-      <div className="sticky bottom-0">
+      {/* z-index here: sticky makes its own stacking context, so the tab bar must sit above row controls (z-[1]) from this level. */}
+      <div className="sticky bottom-0 z-(--z-header)">
         <TabBar hid={hid} />
       </div>
       {switching && <SwitcherSheet current={hid} onClose={() => setSwitching(false)} />}
